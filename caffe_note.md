@@ -2,14 +2,14 @@
 &nbsp;     　　　　　　　　　　　　　　　　　　　　　　  sqlu@zju.edu.cn
 
 ## 可视化
-[upload prototxt to this link](http://dgschwend.github.io/nescope/#/editor) 
-##caffe 内核代码
+[upload prototxt to this link](http://dgschwend.github.io/nescope/#/editor)  
+## caffe 内核代码
 需了解Blob,Layer,Net,Solver源码;
 Net: a set of layers
 name:"dummy-net"
 layer {name: "data"...}
 Layer: name, type, bottom, top, parameters(refer　to caffe.proto)
-##how to develop new layers in CAFFE
+## how to develop new layers in CAFFE
 consisted of 
 - Setup:
 for one-time initialization: read parameters, fixed-size allocations,etc.
@@ -25,13 +25,38 @@ class　name is the python layer name
 all four functions above are to be realized in this class
 
 ## pycaffe
-`caffe.set_device(gpu_id)`
-`caffe.set_mode_{gpu,cpu}()`
+- net 对象构建
 `net = caffe.Net(model_def,`　  # defines the structure of the model: prototxt
 &nbsp;　　 　　　　　 　`model_weights,` #contains the trained weights:caffemodel
 &nbsp; 　　　　　　　　 `caffe.TRAIN)` #phase
 `net.copy_from(model_weights)`
-- *optional* preprocess  可用任何工具包得到ndarray数据，caffe 提供caffe.io.Transformer类:
+- caffe.NetSpec()获得net, 只需不断填充，返回的都是Top blobs,都是n.__setattr__("name",blob) <=> n.name = blob
+caffe.layers提供与proto的交互,layers.type(bottomblob, *,attr)
+最后.to_prototxt()输出序列化字符串，写入文件即可
+例如:
+`n = caffe.SpecNet()　 `
+`n,conv1 = layers.Convolutions(n.data,kernal_size = 5,num_output = 20,weight_filler = dict(type = "xavier"))`
+`n.pooling1 = layers.Pooling(n.conv1,kernel_size = 2,stride = 2,pool = caffe.parameters.Pooling.MAX)`
+`n.fc1 = layers.InnerProduct(n.pool2,num_output=500,,weight_filler = dict(type = "xavier"))`
+`n.relu1 = layers.ReLU(n.fc1,in_place = True)`
+`layers.SoftmaxWithLoss(n.score,n.label)`
+- data structure
+net.blobs : OrderedDict, (NxCxHxW) 以name为键,blob为值
+net.params: OrderedDict, [0] for weight blobs(output_chanel, input_chanel,filter_height,filter_width) 跟blob等价
+&nbsp; 　　　　    　　　　　　　　[1]for bias blob
+
+- solver对象构建
+`from caffe.proto import caffe_pb2`
+`s = caffe_pb2.SolverParamer()` #solver.prototxt里面的key都可以作为成员属性，最后f.write(str(s))
+`caffe.get_solver("*.prototxt")`
+可用.net引用到训练网络,test_nets引用到测试网络列表，有step(n)方法前像反向传播n步并更新
+`net.forward()` # 返回各个输出层的dict(name ,blob)，也可以通过net.blobs来取
+`net.save()` # 保存caffemodel
+- 计算处理
+`caffe.set_device(gpu_id)`
+`caffe.set_mode_{gpu,cpu}()`
+
+*optional* preprocess  可用任何工具包得到ndarray数据，caffe 提供caffe.io.Transformer类:
 `set_chanel_swap(name)`
 `set_input_scale(name)`
 `set_mean(name)`
@@ -39,25 +64,8 @@ all four functions above are to be realized in this class
 `set_transpose(name)`
 `caffe.io.loadimage()` #　导入成ndarray　(HxWxC)
 `preprocess(name,img)`
-- data structure
-net.blobs : OrderedDict, (NxCxHxW) 以name为键,blob为值
-net.params: OrderedDict, [0] for weight blobs(output_chanel, input_chanel,filter_height,filter_width) 跟blob等价
-&nbsp; 　　　　    　　　　　　　　[1]for bias blob
-- caffe.NetSpec()获得net, 只需不断填充，返回的都是Top blobs,都是n.__setattr__("name",blob) <=> n.name = blob
-caffe.layers提供与proto的交互,layers.type(bottomblob, *,attr)
-最后.to_prototxt()输出序列化字符串，写入文件即可
-例如:
-n = caffe.SpecNet()　 
-n,conv1 = layers.Convolutions(n.data,kernal_size = 5,num_output = 20,weight_filler = dict(type = "xavier"))
-n.pooling1 = layers.Pooling(n.conv1,kernel_size = 2,stride = 2,pool = caffe.parameters.Pooling.MAX)
-n.fc1 = layers.InnerProduct(n.pool2,num_output=500,,weight_filler = dict(type = "xavier"))
-n.relu1 = layers.ReLU(n.fc1,in_place = True)
-layers.SoftmaxWithLoss(n.score,n.label)
 
-from caffe.proto import caffe_pb2
-s = caffe_pb2.SolverParamer() #solver.prototxt里面的key都可以作为成员属性，最后f.write(str(s))
-caffe.get_solver("*.prototxt")
-可用.net引用到训练网络,test_nets引用到测试网络列表，有step(n)方法前像反向传播n步并更新
-net.forward() 返回各个输出层的dict(name ,blob)，也可以通过net.blobs来取
-net.save() 保存caffemodel
+
+
+
 
