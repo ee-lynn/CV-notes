@@ -7,7 +7,7 @@
  - 检测模型得到MxNxN 的tensor，M包含４个坐标(目标框相对网格左上角的偏移量,目标框的长宽)，1个网格有物体的概率，检测任务中Ｃ类物体的概率
 ## yolo v1
 - backbone 直链，输入448x448
-<center>conv 7x7/2 64
+conv 7x7/2 64
 maxpooling 2x2/2
 conv 3x3 192
 maxpooling 2x2/2
@@ -27,7 +27,6 @@ conv 3x3 1024
 conv 3x3 1024
 FC 4096
 FC 1470
-</center>
 - feature map 说明
 每个网格预测B(B=2)个框，最终的feature map 形状为[2x(4+1)+20]x7x7
 - train
