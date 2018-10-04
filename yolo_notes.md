@@ -1,11 +1,10 @@
-# yolo(you look only once)前世今生　 
+# yolo(you only look  once) 前世今生　 
  &nbsp;　　　　　　　　　　　　sqlu@zju.edu.cn
- 
 ## 基本思想
  - 讲目标检测问题看成回归问题，图像经过CNN后直接得到是什么(类别概率),在哪里(目标框)
  - 根据CNN平移不变性，最终得到feature map为NxN时，就是将原图分割为NxN的网格进行检测，每个点感受野为以该网格中心的区域
  - 检测模型得到MxNxN 的tensor，M包含４个坐标(目标框相对网格左上角的偏移量,目标框的长宽)，1个网格有物体的概率，检测任务中Ｃ类物体的概率
-## yolo v1
+ ## yolo v1
 
 - backbone 直链，输入448x448
       conv 7x7/2 64 
@@ -98,12 +97,12 @@ $$p_w,p_h$$是anchor的长宽,用对数空间更大区分大小目标框惩罚�
       conv 1x1 512
       conv  3x3 1024
       ----------------------------------------------------
-      classifer                       |  detection
+      classifer                         |  detection
       conv  1x1 1000     　  |    conv 1x1 1024
       global ave pooling      |    conv 3x3 1024 
-                                          |     concat　　　with [shortcut]
-                                          |   conv 3x3　 1024       
-                                          |   conv 1x1 125 (5个anchor,20类) 
+                                            |   concat with [shortcut]
+                                            |   conv 3x3　 1024       
+                                            |   conv 1x1 125 (5个anchor,20类) 
 ## yolo v3
 - backbone
       conv 3x3 32
@@ -117,17 +116,17 @@ $$p_w,p_h$$是anchor的长宽,用对数空间更大区分大小目标框惩罚�
       residual conv 1x1 256, conv 3x3 512  x8
       conv 3x3/2 1024   [shortcut scale1]
       residual conv 1x1 512, conv 3x3 1024  x4
-      classifier             |      detection       
+      classifier              |      detection       
       global pooling    | 1x1 512, 3x3 1024   x3 ->1x1 75 大目标框
-      FC 1000             | conv1x1 256
-                                  |upsample x2
-                                  |concat with [shortcut scale1]
-                                  |conv 1x1 256 , 3x3 512   x2  ->1x1 256, 3x3 512, 1x1 75 中目标框
-                                 |conv 1x1 128
-                                 |upsample x2
-								 |concat with [shortcut scale0
-								 |conv 1x1 128, conv 3x3 256   x2
-								 |conv 1x1 75 小目标框
+      FC 1000              | conv1x1 256
+                                   |upsample x2
+                                   |concat with [shortcut scale1]
+                                   |conv 1x1 256 , 3x3 512   x2  ->1x1 256, 3x3 512, 1x1 75 中目标框
+                                   |conv 1x1 128
+                                   |upsample x2
+								   |concat with [shortcut scale0
+								   |conv 1x1 128, conv 3x3 256   x2
+								   |conv 1x1 75 小目标框
 - 多标签分类，采用sigmoid输出类别概率
 - feature pyramid
 在三个尺度上各出３个anchor(32x32,16x16,8x8),feature　map不一样大,最后一起做预测时可以以预测向量concat.
