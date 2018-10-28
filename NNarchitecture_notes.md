@@ -157,7 +157,7 @@ accelarate trainning spped
        
         input
         Conv 1x1  Conv 1x1  Conv 1x1  Max pool 3x3
-                  Conv 3x3  Conv 3x3  Conv 1x1
+                Conv 3x3  Conv 3x3  Conv 1x1
                             Conv 3x3
         Concat
         
@@ -192,30 +192,14 @@ accelarate trainning spped
 - 结果显示,Residual learning 可以让模型更快收敛,但是最终结果还是由模型容量决定.
 - 在Residul 支路加一个0.1的恒定常数scale，可以稳定训练过程
 *notes* 文中因内存的限制,Inception-ResNet V1在residual之后elementwise add之后　ReLU之前没有BatchNorm.
-- 模块单元结构
-(1)
-
-(2)
-
-(3)
-
-(4)
-
-(5)
-
-(6)
-
-
-
-
 - Inception-ResNet V1　网络结构
 
-        stem
-        5 x inception-resnet-A
-        Redution-A
-        10 x inception-resnet-B
-        reduction-B
-        5 x inception-resnet-C
+        stem                    (1)
+        5 x inception-resnet-A  (11)
+        Redution-A              (5) k=192,l=192,m=256,n=256
+        10 x inception-resnet-B (12)
+        reduction-B             (13)
+        5 x inception-resnet-C  (14)
         Ave pool
         dropout(0.2)
         FC
@@ -224,12 +208,12 @@ accelarate trainning spped
 
 - Inception V4　网络结构
 
-        stem
-        4 x Inception-A
-        Reduction-A
-        7 x Inception-B
-        Reduction-B
-        3 x Inception-C 
+        stem              (1)
+        4 x Inception-A   (2)
+        Reduction-A       (5) k=192,l=224,m=256,n=384
+        7 x Inception-B   (3)
+        Reduction-B       (6)
+        3 x Inception-C   (4)
         Ave pool
         dropout(0.2)
         FC
@@ -238,25 +222,170 @@ accelarate trainning spped
 
 - Inception-ResNet V2　网络结构
 
-        stem
-        5 x inception-resnet-A
-        Redution-A
-        10 x inception-resnet-B
-        reduction-B
-        5 x inception-resnet-C
-        Ave pool
-        dropout(0.2)
+        stem                   (15)
+        5 x inception-resnet-A (7)
+        Redution-A             (5) k=256,l=256,m=384,n=384
+        10 x inception-resnet-B(8)
+        reduction-B            (9)
+        5 x inception-resnet-C (10)
+        Ave pool                       
+        dropout(0.2)  
         FC
         softmax
 **Top-1 19.9%, Top-5 4.9%**
 
-####Xception
+- 模块单元结构 *notes: V represents  valid padding*
+   
+    - (1)
+                    
+            Conv 3x3 /2 32 V
+            Conv 3x3 32 V
+            Conv 3x3 64
+            Max pool 3x3 /2   Conv 3x3 /2 96
+            Concat
+            Conv 1x1 64       Conv 1x1 64
+            Conv 3x3 96 V     Conv 7x1 64
+                              Conv 1x7 64
+                              Conv 3x3 96 V
+            Concat
+            Conv 3x3 192 V  Max pool 3x3 /2 V
+            Concat
+            
+    - (2)
+             
+            input
+            Ave pool    Conv 1x1 96  Conv 1x1 64 Conv 1x1 64
+            Conv 1x1 96              Conv 3x3 96 Conv 3x3 96
+                                                 Conv 3x3 96
+            Concat
+    
+    - (3)
+    
+            input
+            Ave pool     Conv 1x1 384  Conv 1x1 192   Conv 1x1 192
+            Conv 1x1 128               Conv 1x7 224   Conv 1x7 192
+                                       Conv 7x1 256   Conv 7x1 192
+                                                      Conv 1x7 224
+                                                      Conv 7x1 256
+            Concat
+
+    - (4)
+    
+            input
+            Ave pool     Conv 1x1 384     Conv 1x1 384        Conv 1x1 384
+            Conv 1x1 128            Conv 1x3 256 Conv 3x1 256 Conv 1x3 448
+                                                              Conv 3x1 512
+                                                       Conv 3x1 256 Conv 3x1 256
+             Concat
+
+    - (5)
+    
+            input
+            Maxpool 3x3/2V Conv 3x3 n/2 Conv 1x1 k
+                                        Conv 3x3 l
+                                        Conv 3x3 /2 m V
+
+    - (6)
+    
+            input
+            Max pool  Conv 1x1 192      Conv 1x1 256
+                      Conv 3x3 192/2V   Conv 1x7 256
+                                        Conv 7x1 320
+                                        Conv 3x3 /2 320 V
+                                        
+    - (7) 
+    
+            input
+            Conv 1x1 32  Conv 1x1 32 Conv 1x1 32
+    　　                 Conv 3x3 32  Conv 3x3 32
+       　　　　  　　                  Conv 3x3 32
+            Concat
+            Conv 1x1 256(linear)
+            eltwise add input
+    
+    - (8)
+   
+            input
+            Conv 1x1 128  Conv 1x1 128
+                          Conv 1x7 128
+                          Conv 7x1 128
+            Concat
+            Conv 1x1 896(linear)
+            eltwise add input
+               
+     - (9)
+     
+            input
+            Maxpool 3x3/2V  Conv 1x1 256    Conv 1x1 256 Conv 1x1 256
+                            Conv 3x3 384/2V Conv 3x3/2V Conv 1x1 256
+                                                         Conv 3x3/2 256V
+            Concat
+          
+     - (10)
+     
+            input
+            Conv 1x1 192 Conv 1x1 192
+                         Conv 1x3 192
+                         Conv 3x1 192
+             Concat
+             Conv 1x1 1792(linear)
+             eltwise add input
+          
+      - (11)
+          
+            input   
+            Conv  1x1 32 Conv 1x1 32 Conv 1x1 32
+                         Conv 3x3 32 Conv 3x3 48
+                         Conv 3x3 64
+            Concat
+            Conv 1x1 384(linear)
+            eltwise add input
+              
+       - (12)
+       
+             input
+             Conv 1x1 192   Conv 1x1 128
+                            Conv 1x7 160
+                            Conv 7x1 192
+             Concat
+             Conv 1x1 1154(linear)
+             eltwise add input
+       
+       - (13)
+       
+             input Maxpool 3x3/2V  Conv 1x1 256    Conv 1x1 256    Conv 1x1 256
+                                   Conv 3x3 384/2V Conv 3x3 288/2V Conv 3x3 288
+                                                                   Conv 3x3 320/2V 
+                                       
+       - (14)
+       
+             input Conv 1x1 192 Conv 1x1 192
+                                Conv 1x3 224
+                                Conv 3x1 256
+             Concat
+             Conv 1x1 2048 (linear)
+             eltwise add input
+              
+       - (15)
+       
+             input
+             Conv 3x3 32/2V
+             Conv 3x3 32 V
+             Conv 3x3 64
+             Max pool /2 V
+             Conv 1x1 80
+             Conv 3x3 192 V
+             Conv 3x3 256/2V
+     
+#### Xception
     François Chollet. Xception: Deep Learning with Depthwise Separable Convolutions.  arXiv:1610.02357v3
+    
+    
     
 #### NasNet
 
 
-###ResNet and its Variety
+### ResNet and its Variety
 2016年K.M. He 自提出residual　learning便一举成名。
 它的intuition很自然:　既然前期研究结果显示神经网络深度很重要，那么不断增加深度会怎么样？
 实验结果表明不断增加深度并不会使结果单调地变好，当网络变得非常深时,效果甚至很差。将深层网络看成浅层网络的渐进堆叠，即深度增量部分只要是恒等映射，效果就不会更差。此时作为深度增量的卷积层拟合0，再配合skip connection就可使更深的网络等价于对应浅一些的网络。
