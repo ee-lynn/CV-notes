@@ -38,9 +38,6 @@ accelarate trainning spped
         FC 
         softmax
 
-- ImageNet 结果
-**Top-1 36.7% Top-5 15.4%**
-
 ### VGG
     Simonyan K, Zisserman A. "Very Deep Convolutional Networks for Large-Scale Image Recognition". arXiv:1409.1556, 2014.
     
@@ -76,9 +73,6 @@ accelarate trainning spped
         FC  4096 dropout(0.5)
         FC  
         softmax
-        
-- ImageNet 结果
-**muticrop ensemble Top-1 24.4% Top-5 7.1%**
   
 ###GoogLeNet and Inception family
 
@@ -132,7 +126,6 @@ GoogLe自2014年ImageNet 提出第一名GoogLeNet后,又在之后相继提出了
              dropout(0.7)
              FC 1000 
              softmax
-**Top-1 ~29%, Top-5 10.07%**
              
       - Inception V1
       在ReLU前均插入了BatchNorm层，此后Conv-BatchNorm-ReLU为标配.　
@@ -149,7 +142,6 @@ GoogLe自2014年ImageNet 提出第一名GoogLeNet后,又在之后相继提出了
             inception (4e) n1=0 n31=128 n51=192 np=0 n3=192 n5=192 
             inception(5a) n1=352 n31=192 n51=160 np=128 n3=320 n51=160
             inception(5b) n1=352 n31=192 n51=192 np=128 n3=320 n5=192
-**Top-1 25.2%, Top-5 7.8%**
 
 #### Inception V2 & V3
 
@@ -184,9 +176,8 @@ GoogLe自2014年ImageNet 提出第一名GoogLeNet后,又在之后相继提出了
         
 - 输入分辨率改成299(初始主干部分和inception　stride时候都valid pad,主干部分删去 Conv 1x1,改成两个Conv 3x3 /2, Conv 3x3)
 以上结构称为**Inception V2**
-**Top-1 23.4%, Top-5 -%**
+
 - 将最开始的7x7卷积也改成3层3x3卷积堆叠(conv 3x3 /2; conv 3x3; conv  3x3 padded),使用RMSProp训练，添加先验为均匀分布的交叉熵损失(权重0.1,作为label　smoothing)　称为**Inception V3**
-**Top-1 21.2%, Top-5 5.6%**
 
 #### Inception V4 & Inception-ResNet V1 & V2
     Christian Szegedy, Sergey Ioffe, Vincent Vanhoucke, Alex Alemi. "Inception-v4, Inception-ResNet and the Impact of Residual Connections on Learning".  arXiv:1602.07261v2 
@@ -207,7 +198,6 @@ GoogLe自2014年ImageNet 提出第一名GoogLeNet后,又在之后相继提出了
         dropout(0.2)
         FC
         softmax
-**Top-1 21.3%, Top-5 5.5%**
 
 - Inception V4　网络结构
 
@@ -221,7 +211,6 @@ GoogLe自2014年ImageNet 提出第一名GoogLeNet后,又在之后相继提出了
         dropout(0.2)
         FC
         softmax
-**Top-1 20.0%, Top-5 5.0%**
 
 - Inception-ResNet V2　网络结构
 
@@ -235,7 +224,6 @@ GoogLe自2014年ImageNet 提出第一名GoogLeNet后,又在之后相继提出了
         dropout(0.2)  
         FC
         softmax
-**Top-1 19.9%, Top-5 4.9%**
 
 - 模块单元结构 *notes: V represents  valid padding*
    
@@ -419,8 +407,6 @@ GoogLe自2014年ImageNet 提出第一名GoogLeNet后,又在之后相继提出了
         dropout(0.5)
         FC
         softmax
-        
- - **Top-1 21.1%, Top-5  5.5%**
     
 #### NasNet
 
@@ -459,20 +445,78 @@ GoogLe自2014年ImageNet 提出第一名GoogLeNet后,又在之后相继提出了
     - depthwise 和 pointwise中间不用BN,ReLU
     - 使用了lable smooth(0.1) 和辅助classifier
     - 使用scheduled droppath训练.直接elementwise使用dropout效果变差,使用固定概率的droppath没什么效果,需要使用一个线性增加的概率整条支路都drop掉
-    - **Top-17.3% Top-5 3.8**
  
+### ResNet and its Variants
+intuition:　既然前期研究结果显示神经网络深度很重要，那么不断增加深度会怎么样？实验结果表明不断增加深度并不会使结果单调地变好，当网络变得非常深时,效果甚至很差。将深层网络看成浅层网络的堆叠，即深度增量部分只要是恒等映射，效果就不应该更差，此时作为深度增量的卷积层拟合残差０，再配合skip connection　Identity就可使更深的网络等价于对应浅的网络。
+另外一种理解residual structure 的角度是identity mapping 提供了梯度反向传播的路径，使深层权值能更有效地优化。 因此若将网络每层都稠密连接，将导出**DenseNet**,融合ResNet和DenseNet便导出**DualPathNet**
 
-### ResNet and its Variety
-intuition:　既然前期研究结果显示神经网络深度很重要，那么不断增加深度会怎么样？
-实验结果表明不断增加深度并不会使结果单调地变好，当网络变得非常深时,效果甚至很差。将深层网络看成浅层网络的渐进堆叠，即深度增量部分只要是恒等映射，效果就不会更差。此时作为深度增量的卷积层拟合0，再配合skip connection就可使更深的网络等价于对应浅一些的网络。
-另外一种理解residual structure 的角度是identity mapping 提供了梯度反向传播的路径，使深层权值能更有效地优化。 因此若将网络做成稠密连接，将导出**DenseNet**,融合ResNet和DenseNet便导出**DualPathNet**
+    Kaiming He, Xiangyu Zhang, Shaoqing Ren, et al. "Deep Residual Learning for Image Recognition."  arXiv:1512.03385.
+    Kaiming He, Xiangyu Zhang, Shaoqing Ren, et al. "Identity Mappings in Deep Residual Networks". arXiv:1603.05027
+   
+#### ResNet
 
-    Kaiming He, Xiangyu Zhang, Shaoqing Ren, et al. Deep Residual Learning for Image Recognition.  arXiv:1512.03385.
-    Kaiming He, Xiangyu Zhang, Shaoqing Ren, et al. Identity Mappings in Deep Residual Networks.	arXiv:1603.05027
-    Zagoruyko, Sergey, Komodakis, Nikos. Wide Residual Networks.  	arXiv:1605.07146
+- 采用Residual block堆叠而成,每个Residual block 由两个3x3卷积组成.当网络较深时为控制计算量,用1x1卷积先降低特征深度,再经3x3卷积后用1x1卷积恢复深度,称为 bottleneck.
+- 在降采样时(该阶段的第一个卷积用strided　convolution实现),通道数相应变厚，使每层计算量保持相当.此时的Identity可以直接用0部齐深度，或者用1x1/ 2卷积扩张深度.　Identity支路需要保持干净，不要引入别的阻碍梯度传递的环节.
+- 为了更有利于梯度传递,在Eltwise add后都不加非线性环节.此时需要将激励非对称地加入到Residual　支路中,将引出一种BN-ReLU-Conv-BN-ReLU-Conv的Residual支路结构,称为pre-activation.
+- 遵循以上三点可以设计一系列ResNet, 下面以ResNet-152为例(重复卷积层都是Residual支路)
+
+        Conv 7x7 /2 64
+        Max pool 3x3 /2
+        -------------------- x3
+        Conv 1x1 　64
+        Conv 3x3  64
+        Conv 1x1  256
+        -------------------- x8
+        Conv 1x1 　128
+        Conv 3x3  128
+        Conv 1x1  512
+        -------------------- x36
+        Conv 1x1 　256
+        Conv 3x3  256
+        Conv 1x1  1024
+        -------------------- x3
+        Conv 1x1 　512
+        Conv 3x3  512
+        Conv 1x1  2048
+        --------------------
+        Ave pool
+        FC
+        softmax
+        
+    
+#### Wide ResNet
+   
+    Zagoruyko, Sergey, Komodakis, Nikos. "Wide Residual Networks". arXiv:1605.07146
+    
+- ResNet将网络设计的很深，甚至将Residual支路设计成bottleneck结构,更显网络细长.而在如此深的网络中,信息通过skip conection流动,很多卷积层贡献很小甚至是多余的.
+- 为了更大化利用Residual支路,让它变得更宽.为防止过拟合,在堆叠的两个3x3卷积之间加入dropout  *notes*既然要宽,就不考虑bottleneck那种1x1,3x3,1x1结构了.
+- 在训练中更宽的网络可以更有效地利用GPU并行计算能力,使得计算更快(8倍).
+- 网络只需将对应的Residual支路加宽k倍即可. 16层WRN,k=2时[取前面ResNet结构为基准k=1,共三个block,每个block由两个3X3卷积堆叠,每个stage重复5次],在CIFAR-10/100上就超过了ResNet-1001(参数量相当).
+        
+#### ResNeXT
+    
     Xie S, Girshick R, Dollar P, et al. Aggregated Residual Transformations for Deep Neural Networks. arXiv:1611.05431.
-    DPN
-    DenseNet
+     
+- intuition:像Inception那样先拆分,再变换,最后融合方式高效且有效.但结构复杂,难以迁移去指导别的网络设计. 而像VGG,ResNet模块化的设计，结构均匀.
+- 将ResNet中bottleneck改造成多分支结构,分支个数称为cardinality.　
+- 将1x1卷积全部concat起来,3x3卷积各自涉及到对应的通道计算后再经1x1卷积全部相加,实际上等价于将3x3卷积改成了group convolution, cardinality就是组数.设通道数d,组数c.　常规卷积计算量正比于d^2^ ,改造后为c(d/c)^2^=d^2^/c. cadinality越大,计算量越小.因此在计算量一定的限定下, 3x3卷积可以比原先更厚一些(d×c更大).
+- ResNext-101:将ResNet-101略微修改(上图ResNet中重复次数分别为3,4,23,3),第一阶段Conv 3x3 输入输出均为256,组数为64.
+    
+####DenseNet
+
+    Gao Huang, Zhuang Liu, Laurens van der Maaten, Kilian Q. Weinberger."Densely Connected Convolutional Networks".  arXiv:1608.06993v5
+    
+- DenseNet由Dense Block和Transition Block组成. DenseBlock中，每层输入由前面所有层输出concat而成,每层输出新的k层feature. Transition Block由Conv 1x1和Ave pool　2x2/2组成.
+- 在Dense block中基本单位是Conv 1x1; Conv 3x3组成bottleneck(此称为DenseNet-B),在Transition block中Conv 1x1 压缩通道(压缩比取0.5)(此成为DenseNet-C),两者兼有的称为DenseNet-BC
+- Dense connection可以理解为每一层离最终的loss function 都很近，相当于共用辅助分类器.　这里强调了特征的显式重用,而不像ResNet那像特征相当于一个状态而隐式重用(从这个角度类似于展开的RNN).
+ 
+    
+####DualPathNet
+
+    Yunpeng Chen, Jianan Li, Huaxin Xiao, Xiaojie Jin, Shuicheng Yan, Jiashi Feng. "Dual Path Networks". arXiv:1707.01629v2
+    
+- intuition
+    
     
 
  
