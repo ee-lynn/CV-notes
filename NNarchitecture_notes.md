@@ -7,7 +7,7 @@
 - 效率角度的发展
 
 ## more powerful!
-随着深度学习的主干网络结构的变迁,　作为视觉两大基础任务的图片分类和人目标检测任务，在大型数据集上(ImageNet, coco)的指标被逐渐推高.这里就以一些明星网络结构为例,罗列其结构的要点。
+随着深度学习的主干网络结构的变迁,　作为视觉两大基础任务的图片分类和目标检测任务，在大型数据集上(ImageNet, coco)的指标被逐渐推高.这里就以一些明星网络结构为例,罗列其结构的要点。
 ###AlexNet
 
     Krizhevsky, Alex, I. Sutskever, and G. E. Hinton. "ImageNet classification with deep convolutional neural networks." International Conference on Neural Information Processing Systems Curran Associates Inc. 2012:1097-1105.
@@ -455,9 +455,9 @@ intuition:　既然前期研究结果显示神经网络深度很重要，那么�
    
 #### ResNet
 
-- 采用Residual block堆叠而成,每个Residual block 由两个3x3卷积组成.当网络较深时为控制计算量,用1x1卷积先降低特征深度,再经3x3卷积后用1x1卷积恢复深度,称为 bottleneck.
-- 在降采样时(该阶段的第一个卷积用strided　convolution实现),通道数相应变厚，使每层计算量保持相当.此时的Identity可以直接用0部齐深度，或者用1x1/ 2卷积扩张深度.　Identity支路需要保持干净，不要引入别的阻碍梯度传递的环节.
-- 为了更有利于梯度传递,在Eltwise add后都不加非线性环节.此时需要将激励非对称地加入到Residual　支路中,将引出一种BN-ReLU-Conv-BN-ReLU-Conv的Residual支路结构,称为pre-activation.
+- 采用Residual block堆叠而成,每个Residual block 由两个3x3卷积组成.当网络较深时为控制计算量,用1x1卷积先降低特征通道数,再经3x3卷积后用1x1卷积恢复通道数,称为 bottleneck.
+- 在降采样时(该阶段的第一个卷积用strided　convolution实现),通道数相应变厚，使每层计算量保持相当.此时的Identity可以直接用0补齐深度，或者用1x1/ 2卷积扩张深度.　Identity支路需要保持干净，不要引入别的阻碍梯度传递的环节.
+- 原始residual支路为Conv-BN-ReLU-Conv-BN, Eltwise add再ReLU,称为post-activation(进入下面residual的是activated feature),这种结构是后面variants经常采用的.　为了更有利于梯度传递,在Eltwise add后都不加非线性环节.非对称地将激励加入到Residual支路中,将引出一种BN-ReLU-Conv-BN-ReLU-Conv的Residual支路结构,称为pre-activation(进入下面residual需要先activate),将进一步提升post-activation结构的性能.
 - 遵循以上三点可以设计一系列ResNet, 下面以ResNet-152为例(重复卷积层都是Residual支路)
 
         Conv 7x7 /2 64
@@ -493,21 +493,21 @@ intuition:　既然前期研究结果显示神经网络深度很重要，那么�
 - 在训练中更宽的网络可以更有效地利用GPU并行计算能力,使得计算更快(8倍).
 - 网络只需将对应的Residual支路加宽k倍即可. 16层WRN,k=2时[取前面ResNet结构为基准k=1,共三个block,每个block由两个3X3卷积堆叠,每个stage重复5次],在CIFAR-10/100上就超过了ResNet-1001(参数量相当).
         
-#### ResNeXT
+#### ResNeXt
     
     Xie S, Girshick R, Dollar P, et al. Aggregated Residual Transformations for Deep Neural Networks. arXiv:1611.05431.
      
 - intuition:像Inception那样先拆分,再变换,最后融合方式高效且有效.但结构复杂,难以迁移去指导别的网络设计. 而像VGG,ResNet模块化的设计，结构均匀.
 - 将ResNet中bottleneck改造成多分支结构,分支个数称为cardinality.　
 - 将1x1卷积全部concat起来,3x3卷积各自涉及到对应的通道计算后再经1x1卷积全部相加,实际上等价于将3x3卷积改成了group convolution, cardinality就是组数.设通道数d,组数c.　常规卷积计算量正比于d^2^ ,改造后为c(d/c)^2^=d^2^/c. cadinality越大,计算量越小.因此在计算量一定的限定下, 3x3卷积可以比原先更厚一些(d×c更大).
-- ResNext-101:将ResNet-101略微修改(上图ResNet中重复次数分别为3,4,23,3),第一阶段Conv 3x3 输入输出均为256,组数为64.
+- ResNext-101(64x4d):将ResNet-101略微修改(上图各stage重复次数分别为3,4,23,3),第一阶段组数即cardinality为64,每个Conv 3x3 分支4channel,即共256通道,此后随着下采样,通道数逐渐翻倍变厚.
     
 ####DenseNet
 
     Gao Huang, Zhuang Liu, Laurens van der Maaten, Kilian Q. Weinberger."Densely Connected Convolutional Networks".  arXiv:1608.06993v5
     
 - DenseNet由Dense Block和Transition Block组成. DenseBlock中，每层输入由前面所有层输出concat而成,每层输出新的k层feature. Transition Block由Conv 1x1和Ave pool　2x2/2组成.
-- 在Dense block中基本单位是Conv 1x1; Conv 3x3组成bottleneck(此称为DenseNet-B),在Transition block中Conv 1x1 压缩通道(压缩比取0.5)(此成为DenseNet-C),两者兼有的称为DenseNet-BC
+- 在Dense block中基本单位是Conv 1x1　4k; Conv 3x3 k 组成bottleneck(此称为DenseNet-B),在Transition block中Conv 1x1 压缩通道(压缩比取0.5)(此成为DenseNet-C),两者兼有的称为DenseNet-BC (k可取32,48等)
 - Dense connection可以理解为每一层离最终的loss function 都很近，相当于共用辅助分类器.　这里强调了特征的显式重用,而不像ResNet那像特征相当于一个状态而隐式重用(从这个角度类似于展开的RNN).
  
     
@@ -515,16 +515,92 @@ intuition:　既然前期研究结果显示神经网络深度很重要，那么�
 
     Yunpeng Chen, Jianan Li, Huaxin Xiao, Xiaojie Jin, Shuicheng Yan, Jiashi Feng. "Dual Path Networks". arXiv:1707.01629v2
     
-- intuition
-    
-    
-
- 
+- intuition:　结合了ResNet特征重用和DenseNet发现新特征的能力,沿用ResNet的bottlenet时,最后Conv 1x1　输出split成两部分,一部分Eltwise　add用作residual　path,另一部分concat到前面本底特征作为Dense connection path.　再结合ResNeXt中cardinality效果(Conv 3x3 用group convolution表示).
+   
 ### Attention in CNN
-SEnet CMBA??
+SEnet CMBA，residual attention??
 
 ## more efficient!
-
+在算力有限的硬件平台难以支撑庞大的模型，因此需要用更小的模型来达到胜任的效果.间接方法是将大模型剪裁,压缩,量化达到减少模型大小和加速推断的效果,直接方法是直接设计高效模型.这一节仅聚焦于高效模型的设计出发点和结构.
 ###SqueenzeNet
-###MobileNet family
+
+    Forrest N. Iandola, Song Han, Matthew W. Moskewicz, Khalid Ashraf, William J. Dally, Kurt Keutzer. "SqueezeNet: AlexNet-level accuracy with 50x fewer parameters and <0.5MB model size". arXiv:1602.07360v4
+
+- 压缩模型且保持性能的出发点:
+    - 将1x1卷积替代3x3卷积,减少运算量和参数
+    - 减少3x3卷积输入的通道数,减少运算量和参数
+    - 降采样阶段尽量后延,能够在大尺度上得到更好的特征
+- firemodule
+基于以上发出发点，设计的block成为firemodule.这个block本质上是一种mini型的inception，结构为:
+        
+        Conv 1x1                # squeeze layer
+        Conv 1x1  Conv 3x3      # expand layer 
+        Concat
+        
+ - firemodule 超参数
+ 在squeeze layer中用1x1卷积降低通道数,在expand layer中将部分3x3卷积用1x1卷积代替.几个超参数: 3x3卷积占expand　layer的比例,squeeze layer 占expand layer 通道的压缩比,  expand layer 的通道每隔若干个增加若干通道.
+ - SqueezeNet 
+ 选择第一个fire module expand layer　128 通道,每隔2个module增加128个,　3x3占比0.5, 压缩比0.125.实验表明这两个系数越大性能越好，但是会饱和,最后选在了膝点上.进一步引入skip connection,　即在相同通道数的支路引入residual　path会进一步提高网络性能.　值得指出的是,因为每两个module要增加通道数不能直接加入identity mapping作为skpi connection，若用1x1变换通道数时,还不如不增加这些1x1的skip coonnection. (当然,性能还是比移除全部skip connection要好)
+ 
+        Conv 7x7/2 96
+        max pool 3x3 /2
+        fire module
+        residual fire module  
+        firemodule
+        max pool 3x3 /2
+        residual fire module  
+        fire module
+        residual fire module 
+        fire module
+        max pool 3x3 /2
+        residual fire module 
+        Ave pool
+        FC
+                
+### MobileNet family
+
+#### MobileNet V1
+
+    Andrew G. Howard, Menglong Zhu, Bo Chen, Dmitry Kalenichenko, Weijun Wang, Tobias Weyand, Marco Andreetto, Hartwig Adam. "MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications". arXiv:1704.04861v1 
+    
+- 采用seperable　convolution带来的效益
+假设输入blob　为NxC_{i}xHxW,输出为NxC_{o}xHxW,卷积大小为KxK,那么卷积核参数量便为C_{o}xC_{i}xKxK,计算量(FLOPs)为HxWxC_{o}xC_{i}xKxK. 若将卷积变成group convolution，即输入blob在channel维上分成g组,每个卷积核在组组内做卷积后把所有结构在channel维上concat得到最终结果.那么卷积核参数量就变成C_{o}xC_{i}/gxKxK,计算量为HxWxC_{o}xC_{i}/gxKxK. 当分组数与channel数相同时,便蜕化成depthwise　convolution,每个输入channel一个卷积核得到一个特征,再经1x1卷积(pointwise convolution)便成为seperable convultion，是把常规卷积在通道数和空间维度解耦的轻量级实现.　seperable　coinvolution的参数量为C_{i}xKxK+C_{o}xC_{i}　,计算量为HxWxC_{i}xKxK+HxWxC_{i}xC_{o}.
+- 用两个参数控制整个网络的大小: 输入分辨率(空间维度的缩放系数)和网络宽度因子(通道维度的缩放系数).计算量都大约他们平方成正比.
+- 小模型训练时weight decay比较小,也不需要辅助分类器和label smoothing.
+- 网络结构　基本上就是用seperable convolution实现的VGG,max pooling 均由该阶段第一个卷积stride为2表示.
+
+        Conv 3x3 /2 32
+        sep Conv 3x3 64
+        ----------------------- stage II, repeat 2 times
+        sep Conv 3x3 128
+        ----------------------- stage III,repeat 2 times
+        sep Conv 3x3 256
+        ----------------------- stage IIII, repeat 6 times
+        sep Conv 3x3 512
+        ----------------------- stage IV,repeat 2 times
+        sep Conv 3x3 1024
+        Ave pool
+        FC
+　　　　　　　 
+#### MobileNet V2
+
+        Mark Sandler, Andrew Howard, Menglong Zhu, Andrey Zhmoginov, Liang-Chieh Chen. "MobileNetV2: Inverted Residuals and Linear Bottlenecks". arXiv:1801.04381v3
+    
+- 在
+    
+
+
+
+
+
+    
 ###ShuffleNet family
+#### shuffleNet V1
+    Xiangyu Zhang, Xinyu Zhou, Mengxiao Lin, Jian Sun. "ShuffleNet: An Extremely Efficient Convolutional Neural Network for Mobile Devices".  arXiv:1707.01083v2
+    
+####shuffleNet V2
+    Ningning Ma, Xiangyu Zhang, Hai-Tao Zheng, Jian Sun. "ShuffleNet V2: Practical Guidelines for Efficient CNN Architecture Design". arXiv:1807.11164v1
+    
+    
+
+
