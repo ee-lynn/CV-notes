@@ -518,7 +518,11 @@ intuition:　既然前期研究结果显示神经网络深度很重要，那么�
 - intuition:　结合了ResNet特征重用和DenseNet发现新特征的能力,沿用ResNet的bottlenet时,最后Conv 1x1　输出split成两部分,一部分Eltwise　add用作residual　path,另一部分concat到前面本底特征作为Dense connection path.　再结合ResNeXt中cardinality效果(Conv 3x3 用group convolution表示).
    
 ### Attention in CNN
-SEnet CMBA，residual attention??
+
+    Sanghyun Woo, Jongchan Park, Joon-Young Lee, In So Kweon. "CBAM: Convolutional Block Attention Module". arXiv:1807.06521v2
+    Jie Hu, Li Shen, Samuel Albanie, Gang Sun, Enhua Wu. "Squeeze-and-Excitation Networks". arXiv:1709.01507v3
+    Fei Wang, Mengqing Jiang, Chen Qian, Shuo Yang, Cheng Li, Honggang Zhang, Xiaogang Wang, Xiaoou Tang. "Residual Attention Network for Image Classification". arXiv:1704.06904v1
+
 
 ## more efficient!
 在算力有限的硬件平台难以支撑庞大的模型，因此需要用更小的模型来达到胜任的效果.间接方法是将大模型剪裁,压缩,量化达到减少模型大小和加速推断的效果,直接方法是直接设计高效模型.这一节仅聚焦于高效模型的设计出发点和结构.
@@ -571,13 +575,13 @@ SEnet CMBA，residual attention??
 
         Conv 3x3 /2 32
         sep Conv 3x3 64
-        ----------------------- stage II, repeat 2 times
+        ----------------------- stage II x2
         sep Conv 3x3 128
-        ----------------------- stage III,repeat 2 times
+        ----------------------- stage III x2
         sep Conv 3x3 256
-        ----------------------- stage IIII, repeat 6 times
+        ----------------------- stage IV x6
         sep Conv 3x3 512
-        ----------------------- stage IV,repeat 2 times
+        ----------------------- stage V x2
         sep Conv 3x3 1024
         Ave pool
         FC
@@ -586,21 +590,91 @@ SEnet CMBA，residual attention??
 
         Mark Sandler, Andrew Howard, Menglong Zhu, Andrey Zhmoginov, Liang-Chieh Chen. "MobileNetV2: Inverted Residuals and Linear Bottlenecks". arXiv:1801.04381v3
     
-- 在
-    
+- intuition:在feature维度较少时,使用ReLU会破坏信息,且难以恢复.而当先升维经过ReLU再降维,信息将大概率保留. 因此本文提出了一种上边厚,下边薄的inverted　bottleneck. 本来botttleneck设计初衷就是为了降低3x3卷积的计算量,但是现在将其改造成seperable convolution后计算量减少很多,不再需要bottleneck减少输入通道数.
+- 基本组成单元: inverted bottleneck. 就是一个上边厚，下面小的bottleneck(post activation)，其中3x3卷积都是separable convolution. 为了降低信息损失，在通道数较少的eltwise　add之后移除了ReLU.
+- 网络结构　虽然其比V1层数多,基本组成单位还多了1x1卷积,但每个block的输入输出通道数很少(极大地减少了conv 1x1计算量),总体上比V1计算量更少. 定义扩张比t为inverter bottleneck中间1x1输出通道比输出通道数,降采样都是通过每个阶段第一个block中separable convolution 3x3 stride=2实现. *notes*　该网络的宽度系数小于1时将不应用于最后一层Conv 1x1以保持性能
 
-
-
-
-
-    
+        Conv 3x3/2 32
+        inverted bottleneck 16 t=1
+        --------------------------    stage　II  x 2
+        inverted bottleneck 24 t=6
+        --------------------------    stage　III x 3 
+        inverted bottleneck 32 t=6
+        --------------------------    stage IV x 4 
+        inverted bottleneck 64 t=6
+        ---------------------------     x3 
+        inverted bottleneck 96 t=6
+        --------------------------    stage V x 3 
+        inverted bottleneck 160 t=6
+        -------------------------- 
+        inverted bottleneck 320　t=6
+        Conv 1x1　1280
+        Ave pool
+        FC
+　　　　
 ###ShuffleNet family
+
 #### shuffleNet V1
+
     Xiangyu Zhang, Xinyu Zhou, Mengxiao Lin, Jian Sun. "ShuffleNet: An Extremely Efficient Convolutional Neural Network for Mobile Devices".  arXiv:1707.01083v2
-    
+
+-  将seperable convolution中1x1　卷积改造成group convolution将进一步降低运算量以便加宽网络
+- 将1x1conv也改造成group后,各个group之间就没有信息交换了(一开始就将各个通道分组，别对做depthwise 3x3 ,1x1卷积后concat),因此这些操作完后需要增加一个channel shuffle操作,即每个group中第i个channel　拼接成group　i.即　blob.transpose(1,0,2,3).reshape(num,channel,height,width)
+- 在post-activation bottleneck中,有两个1x1 conv，但只在第一个后面添加channel shuffle(在第2个1x1 conv 后面再加没有什么提升，只是起到恢复通道数作用),且与Xception相同,在depthwise 3x3 conv 后不加ReLU.
+
+        shuffle unit:
+        1x1 group convolution 
+        BN,ReLU
+        channel shuffle
+        3x3 depthwise convolution
+        BN
+        1x1 group convolution 
+        Eltwise add
+        ReLU
+        
+- 降采样模块借鉴了inception,将3x3/2　Ave pool 和residual path(3x3/2)concat,达到降采样和升维的目的.
+
+        shuffle unit donwsampling:
+        1x1 group convolution         Ave pool 3x3/2
+        BN,ReLU
+        channel shuffle
+        3x3 depthwise convolution
+        BN
+        1x1 group convolution 
+        Eltwise add
+        ReLU
+        
+- shuffleNet结构:与惯例相同，降采样发生在每个阶段的第一个模块,每个bottleneck中间层的压缩比为4,.下面以组数为3为例:
+
+        Conv 3x3/2 
+        Max pool 3x3/2
+        ------------------ stage II x 4
+        shuffleunit 240
+        ------------------stage III x 8
+        shuffleunit 480
+        ------------------stage IV x 4
+        shuffleunit  960
+        Ave pool
+        FC
+       
 ####shuffleNet V2
+    
     Ningning Ma, Xiangyu Zhang, Hai-Tao Zheng, Jian Sun. "ShuffleNet V2: Practical Guidelines for Efficient CNN Architecture Design". arXiv:1807.11164v1
     
+- 在以往高效模型设计时,仅考虑了计算量,而忽略了别的因素:
+    - 数据的获取　
+    - Element wise操作
+    - 并行化程度
     
-
-
+    因此需要在计算量不变的情况下,从以下几个方面优化网络:
+    
+    - 输入输出通道尽量均衡: C_{1}+C_{2} >= 2 \sqrt{C_{1}C_{2}} \alpha \sqrt{FLOPs}
+    - group conv时，group不能取太大,取较大时,通道数必然很多
+    - Elementwise 操作尽量减少,例如Eltwise add等
+    - 减少复杂分支结构,一个block尽量简洁,方便并行计算.
+    
+- V2对V1的改进 
+    - 减少Elementwise操作,将Residual 中的Eltwise add改成了concat.输入在channel上split成两半,一半做identity mapping,另一半卷积后cancat.
+    - 减少分组卷积组数. conv 1x1 不再是分组卷积,(split成半后实际上厚度已经减少了，相当于分了两组).为保持通道数均衡,bottleneck结构改成中间层数与输入输出相同厚度.
+    - channel shuffle 移到concat之后,促使两支进行信息交换融合
+    - 在降采样模块中，分别经改进bottleneck(3x3/2)和seperable conv 3x3/2后concat (相当于将基本模块中split去掉,identity支路变成dw)
