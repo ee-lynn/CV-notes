@@ -1,13 +1,24 @@
 # deep convolutional nerual network architecture
- &nbsp;　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　       by sqlu@zju.edu.cn
+ &nbsp;　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　       by sqlu@zju.edu.cn
 ## overview
 
-CNN在计算机视觉任务中具有越来越举足轻重的作用，不光光在图片分类,目标检测,语义分割等基础任务上一个性能优良的CNN主干网架能极大提升效果，各种主干网架中基础结构和操作还广泛存在于图片风格转换,行为识别,超分辨率,以图搜图等高级任务中.网架结构的设计也逐渐由人工设计发展至算法设计，但即使算法搜索出来的结构，其搜索空间也是人为设计的基本组件构成.
-本文综述自2012年CNN在ILSVRC夺冠以来CNN在结构上的发展,包括
+CNN在计算机视觉任务中具有越来越举足轻重的作用，不光光在图片分类,目标检测,语义分割等基础任务上一个性能优良的CNN主干网架能极大提升效果，各种主干网架中基础结构和操作还广泛存在于图片风格转换,行为分析,超分辨率,以图搜图等高级任务中.网架结构的设计也逐渐由人工设计发展至算法设计，但即使算法搜索出来的结构，其搜索空间也是人为设计的基本组件构成.
+本文综述自2012年CNN在ILSVRC夺冠以来在结构上的发展,包括
 
-- 越来越准确的模型组: AlexNet,VGG, Inception家族(V1-V4,以及autoML产物NasNet), ResNet及其各种变种(Wide ResNet,ResNeXT,DenseNet,DualpathNet);
-- 适合移动端部署的高效小模型: SqueezeNet,MobileNet家族(V1/V2)以及autoML产物MnasNet, shuffleNet 家族(V1-V2);
-- CNN中的提升组件:self-attention机制(squeeze-excitation module[SE], Convolutional block attention module[CBAM], Residual attention).
+- 越来越准确的模型
+    - AlexNet
+    - VGG
+    - Inception家族(V1-V4,以及autoML产物NasNet)
+    - ResNet及其各种变种(Wide ResNet,ResNeXT,DenseNet,DualpathNet);
+- 适合移动端部署的高效小模型
+    - SqueezeNet
+    - MobileNet家族(V1/V2)以及autoML产物MnasNet
+    - shuffleNet 家族(V1-V2);
+- CNN中的提升组件:self-attention机制
+    - spatial attention: spatial transform
+    - channel attention:SE
+    - serial decoupled spatial-channel attention:CBAM
+    - coupled spatial-channel attention:Residual attention.
 
 ## powerful models
 
@@ -662,8 +673,63 @@ intuition:　既然前期研究结果显示神经网络深度很重要，那么�
     
 ### boost block in CNN: attention
 
-作为CNN中作为轻量级组件，self-attention机制的引入将进一步提升CNN的表达能力,且可以嵌入到之前所述任何一种CNN中提升性能.
+作为CNN中作为轻量级组件，self-attention机制的引入将进一步提升CNN的表达能力,且可以嵌入到之前所述任何一种CNN中.根据空间和通道两个维度,本文总结了四种attention机制，分别为spatial transformer, squeenze and excitation, residual attention和 convolution block attention module. 
+
+#### spatial transformer
+
+    Max Jaderberg, Karen Simonyan, Andrew Zisserman,Koray Kavukcuoglu. "Spatial Transformer Networks". arXiv:1506.02025v3.
+    
+- 在FasterRCNN中proposal可以看成一种spatial attention,但它需要根据额外的真值框标注训练RPN,且在训练时因难以对坐标求导而只能近似或者采用多阶段训练. 采用spatial transformer后，就可以仅利用图片类别标签自主学习仿射变换参数和实现对坐标的求导.（建立了输出坐标和输入坐标之间的关系,因此可求得输出像素对输入坐标的梯度,可以反向传播坐标预测对RPN的梯度,但在后期改为RoiAlign后,也不再需要这样)
+- 特征图上做仿射变换后得到输出,由三部分组成
+    - localization 用一般的神经网络参数化坐标变换矩阵,如得到放射变换矩阵的参数，初始化时使得变换矩阵为identity
+    - grid generator 建立输出与输入特征图的坐标映射 torch.functional.affine_grid(theta, size)#size为输出特征图尺寸,theta为变换矩阵,返回对应于输出特征图各个像素坐标的输入图像坐标
+    - sampler 根据映射与变换规则(双线性变换或者最近邻等)得到输出特征图
+    torch.nn.functional.grid_sample(input, grid, mode='bilinear', padding_mode='zeros') #根据输入特征图和上步得到的坐标计算输出特征图像素值.
+- 可以解决输入图像扭曲变形问题,还可以自动发现需要关注的区域,正因为如此,缺点便是仅能处理实例较少的图片.
+
+#### squeenze and excitation
+
+    Jie Hu, Li Shen, Samuel Albanie, Gang Sun, Enhua Wu. "Squeeze-and-Excitation Networks". arXiv:1709.01507v3
+    
+- 这是在通道维度做attention.考虑到卷积局限在自身感受野内,难以感知整张图,因此用一个global pool来对各个channel做权值调整.考虑到调整需要含非线性,各个通道之间不是排它的,因此选用含有隐层的全连接网络,用sigmoid做gating.为减少开支,将隐层维数压缩r倍.
+- 基本结构 以一个block为单位,例如inception或者residual path,将SE单元接在最后调整各个channel，然后再输出.
+        
+        ave pooling        # ->Cx1x1
+        FC                 # ->C/rx1x1
+        ReLU            
+        FC                 # ->Cx1x1
+        sigmoid               
+        product  # 各个channel乘对应权重 
+        
+- 设计出发为克服感受野局限性,但参数和计算量主要集中在网络后期channel多的阶段,在网络后期移除SE模块可以以较少损失换取较多的计算量节省. 调整r逐渐变小计算量的增大并不是单调的使性能变好,实验中r=16为佳.
+- 在主流网络中加上SE,无论原来深度如何,都可以获得近1%的分类准确率和AP的提升.
+
+#### residual attention
+
+    Fei Wang, Mengqing Jiang, Chen Qian, Shuo Yang, Cheng Li, Honggang Zhang, Xiaogang Wang, Xiaoou Tang. "Residual Attention Network for Image Classification". arXiv:1704.06904v1
+
+- 是一种spatial-channel mixed attention,即将blob所有元素统一考虑作为gating.结构为encoder-decoder结构(前期encoder为快速捕捉全局信息),并且结合乘性的residual learning,即feature为F,attention为M时,refined后输出(1+M)*F.
+- 实验表明attention采用普通结构,乘法中不加identity效果都不佳.
+- residual attention结构
+
+        max pooling 
+        residual unit -->
+        max pooling     |
+        residual unit   |
+        residual unit   |
+        upsample        |
+        residual unit   |
+        upsample        |
+        eltwise add  <--
+        Conv 1x1
+        Conv 1x1
+        sigmoid
+        
+#### convolution block attention module(CBAM)
 
     Sanghyun Woo, Jongchan Park, Joon-Young Lee, In So Kweon. "CBAM: Convolutional Block Attention Module". arXiv:1807.06521v2
-    Jie Hu, Li Shen, Samuel Albanie, Gang Sun, Enhua Wu. "Squeeze-and-Excitation Networks". arXiv:1709.01507v3
-    Fei Wang, Mengqing Jiang, Chen Qian, Shuo Yang, Cheng Li, Honggang Zhang, Xiaogang Wang, Xiaoou Tang. "Residual Attention Network for Image Classification". arXiv:1704.06904v1
+    
+- 同时考虑channel和spatial，但将两者解耦,减少计算量
+- channel attention与SE相同,但同时考虑了global max pooling和global Ave pooling,它们共享一个含一层隐层的FC后相加作sigmoid
+- spatial attention:沿channel维度分别作Ave pooling和max pooling 后concat,再接convolution(感受野大一些为佳,采用7X7),最后sigmoid
+- 结合:两个attention module串联,且先channel后spatial效果最好
