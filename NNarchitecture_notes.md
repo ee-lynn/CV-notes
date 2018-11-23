@@ -107,6 +107,7 @@ Google提出GoogLeNet后,又相继提出了Inception V2,V3,V4.他们的共同点
 - 为了使梯度更有效地传播，训练时在网络更浅处插入了两个辅助输出分支, 分别以0.3的权重比例辅助传递梯度. 该举措在后续被证明在训练初期没什么特别大的改善作用.仅在收敛后期略有作用.
 - 预处理和数据增强.　图片只做了减均值预处理. 随机宽高比3/4~4/3, crop 8%~100%，随机的resize插值方法,等。测试时使用144 crop: resize短边到256,288,320,352; 使用左中右/上中下的正方形; 四个224尺寸的角和直接resize到224;镜像.　这样可以得到144个结果，最后做平均.
 - 网络结构(卷积层后自带ReLU,全部都same padding)
+
     - GoogLeNet
     
             Conv 7x7 /2 64
@@ -130,7 +131,7 @@ Google提出GoogLeNet后,又相继提出了Inception V2,V3,V4.他们的共同点
             FC 1000
             softmax
         
-     - 辅助分支接在inception(4a)(4d)处
+    - 辅助分支接在inception(4a)(4d)处
        
              Ave pool 5x5/3V
              Conv 1x1 128
@@ -139,7 +140,7 @@ Google提出GoogLeNet后,又相继提出了Inception V2,V3,V4.他们的共同点
              FC 1000 
              softmax
              
-      - Inception V1
+    - Inception V1
       在ReLU前均插入了BatchNorm层，此后Conv-BatchNorm-ReLU成为CNN标配.将Inception module中5x5卷积改成两个3x3卷积, max pool 改成ave pool.
       在inception之间的max pool 用inception表示,其中3x3 conv stride=2, 内部的pooling仍为max pool。如增加的(3c)和修改的(4e).　inception 内部参数具有调整，现为
         
@@ -304,14 +305,14 @@ Google提出GoogLeNet后,又相继提出了Inception V2,V3,V4.他们的共同点
             Concat
             Conv 1x1 <n>
                 
-     - (9)
+    - (9)
      
             Maxpool 3x3/2V  Conv 1x1 256    Conv 1x1 256 Conv 1x1 256
                             Conv 3x3 384/2V Conv 3x3/2 <k>V Conv 1x1 <m>
                                                          Conv 3x3/2 <l>V
             Concat
               
-     - (10)residual
+    - (10)residual
      
             Conv 1x1 192 Conv 1x1 192
                          Conv 1x3 <k>
@@ -319,7 +320,7 @@ Google提出GoogLeNet后,又相继提出了Inception V2,V3,V4.他们的共同点
              Concat
              Conv 1x1 <m>
                                         
-     - (11)
+    - (11)
        
              input
              Conv 3x3 32/2V
@@ -375,7 +376,7 @@ Google提出GoogLeNet后,又相继提出了Inception V2,V3,V4.他们的共同点
     Barret Zoph, Vijay Vasudevan, Jonathon Shlens, Quoc V. Le. Learning Transferable Architectures for Scalable Image Recognition.  arXiv:1707.07012v4
     
  - 这是运用autoML构建的网络结构，但因其搜索空间和架构的特点，我将其归入Inception　family.
- - intuition:根据是否降采样,将组成网络的单元分成了两种类型的cell(Reduction与Normal).每次降采样,通道数就增倍以保持计算量不变. 基本结构如下: (初始卷积核个数和N将作为控制网络计算量的超参数)
+ - intuition:根据是否降采样,将组成网络的单元分成了两种类型的cell(Reduction与Normal).每次降采样,通道数就增倍以保持计算量不变. 降采样发生在输入的第一次操作.基本结构如下: (初始卷积核个数和N将作为控制网络计算量的超参数)
  
          input 299x299 (311*311)
          Conv 3x3 /2
@@ -542,9 +543,8 @@ intuition:　既然前期研究结果显示神经网络深度很重要，那么�
         sep Conv 3x3 1024
         Ave pool
         FC
-　　　　　　　 
-#### MobileNet V2
 
+#### MobileNet V2　　　　　　　 
         Mark Sandler, Andrew Howard, Menglong Zhu, Andrey Zhmoginov, Liang-Chieh Chen. "MobileNetV2: Inverted Residuals and Linear Bottlenecks". arXiv:1801.04381v3
     
 - intuition:在feature维度较少时,使用ReLU会破坏信息,且难以恢复.而当先升维经过ReLU再降维,信息将大概率保留. 因此本文提出了一种上边厚,下边薄的inverted　bottleneck. 本来botttleneck设计初衷就是为了降低3x3卷积的计算量,但是现在将其改造成seperable convolution后计算量减少很多,不再需要bottleneck减少输入通道数.
@@ -600,9 +600,8 @@ intuition:　既然前期研究结果显示神经网络深度很重要，那么�
         inverted bottleneck 3x3 320 t = 6
         Ave pool
         FC 
-　　　　
-### ShuffleNet family
 
+### ShuffleNet family
 #### shuffleNet V1
 
     Xiangyu Zhang, Xinyu Zhou, Mengxiao Lin, Jian Sun. "ShuffleNet: An Extremely Efficient Convolutional Neural Network for Mobile Devices". arXiv:1707.01083v2
