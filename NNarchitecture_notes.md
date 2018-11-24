@@ -42,7 +42,7 @@ horizontal flipping, random crop[resize 256->crop 224], PCA jittering
         Conv      5x5     256 group=2 ReLU
         Max pool  3x3/2      
         Conv      3x3     384 group=2 ReLU
-        Max pool  5x5/2       
+        Max pool  3x3/2       
         Conv      3x3     384 group=2 ReLU
         Conv      3x3     256 group=2 ReLU
         Max pool  3x3/2    
@@ -391,7 +391,22 @@ Google提出GoogLeNet后,又相继提出了Inception V2,V3,V4.他们的共同点
          FC
          softmax
          
- - autoML 搜索空间: 在先前两层cell输出与之前的融合结果之间选择两个隐层,分别进行某种操作，然后将各自结果融合. 操作空间为(1)identity;(2)Conv1x7 Conv 7x1;(3)Conv 1x3 Conv 3x1;(4)Ave pool 3x3;(5)3x3 dilated Conv;(6)Max pool 5x5;(7)Max pool 3x3;(8)Conv 1x1;(9)Max pool 7x7;(10)depthwise separable Conv 3x3;(11)Conv 3x3;(12)depthwise separable Conv 5x5;(13)depthwise separable Conv 7x7; 融合操作为eltwise add与concat.  按照上述操作B(取5)次后，将所有未使用的隐层concat作为该cell的输出.
+ - autoML 搜索空间: 在先前两层cell输出与之前的融合结果之间选择两个隐层,分别进行某种操作，然后将各自结果融合. 操作空间为
+    - identity;
+    - Conv1x7 Conv 7x1;
+    - Conv 1x3 Conv 3x1;
+    - Ave pool 3x3;
+    - 3x3 dilated Conv;
+    - Max pool 5x5;
+    - Max pool 3x3;
+    - Conv 1x1;
+    - Max pool 7x7;
+    - depthwise separable Conv 3x3;
+    - Conv 3x3;
+    - depthwise separable Conv 5x5;
+    - depthwise separable Conv 7x7;
+    
+  融合操作为eltwise add与concat.  按照上述操作B(取5)次后，将所有未使用的隐层concat作为该cell的输出.
  - 文中给出了三种比较好的结果，这里只以A为例。
     -  Normal cell
               
