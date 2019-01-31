@@ -2,8 +2,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+'''
+author: sqlu@zju.edu.cn
+none-local module demo by pytorch
+'''
 class None_local(nn.Module):
     def __init__(self,in_featrues):
+        super(None_local,self).__init__()
         self.W_theta = nn.Conv3d(in_featrues,in_featrues//2,kernel_size=1)
         self.W_phi = nn.Conv3d(in_featrues,in_featrues//2,kernel_size=1)
         self.W_g = nn.Conv3d(in_featrues,in_featrues//2,kernel_size=1)
