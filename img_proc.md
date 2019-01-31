@@ -5,12 +5,20 @@
  本文分成以下几个部分:
 
 - 颜色空间(GRAY,RGB,HSV,YUV[NV12,NV21])
-- 图像变换与操作(灰度变换,形态学,卷积,基本数据结构)
-- 图像压缩与输入输出(了解一下图像存储格式,opencv的IO操作,绘制)
+- 图像变换与操作(灰度变换,形态学,卷积,opencv基本数据结构)
+- 图像压缩与输入输出(了解一下图像存储格式,opencv/PIL的IO操作,绘制)
 - 背景提取
 - 图像特征点和描述
 - 直方图与跟踪
 - 光流
+###稀疏光流
+
+###稠密光溜
+
+###采用深度学习计算光流
+    Fischer P., Dosovitskiyz A. , Ilgz E., et al, FlowNet: Learning Optical Flow with Convolutional Networks. ICCV 2015
+    Ilg  E., Mayer N., Saikia T., et.al. FlowNet 2.0: Evolution of Optical Flow Estimation with Deep Networks, CVPR 2017
+
 - 三维视觉
 
 

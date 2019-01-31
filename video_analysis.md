@@ -63,13 +63,25 @@
 
 ### ST-ResNet    
     Feichtenhofer C., Pinz A, Richard P .Spatiotemporal Residual Networks for Video Action Recognition. NIPS 2016
--
--
+- 针对双流模型两支在浅层完全分离,设计了两支具有交互的结构,企图学习什么(apearance)做什么运动(motion).并且将双流模型在时间维度上扩展.
+- 在ResNet框架下,通过实验发现信息在block之间传递,或者双向传递效果都不理想.本文采用的方法是将temporal stream中间信息加到spatial stream对应的residual支路中去,相加发生于每个stage(除去第一个stage)的第二个residual block.并且将bottleneck的1x1卷积膨胀为3x1x1卷积,膨胀方式与I3D相同.最后在空间的global ave pooling后在时间上采用5x1x1的max pooling(比ave pool效果好)
+- 训练中为增加正则化效果，BN的方差均值计算采用的batchsize仅取为4.
+- 整个ST-ResNet训练分成3个阶段:
+    - (I) 按照传统方式分别训练spatial stream和temporal stream network
+    - (II)输入5帧,temporal stride在[5,15]随机生成
+    - (III) 将输入改成11帧,temporal stride在[1,15]随机生成，最后在时间维度上max pool后再ave pool
+- 推理时采用全卷积的方式:空间采用全尺寸,并且输入25帧。最后在所有的时空维度上做平均.
 
 ### slowfast Net
     Feichtenhofer C., Fan  H., Malik  J., He  K.. SlowFast Networks for Video Recognition. ArXiv.1812.03982
--
--
+- 在ST-ResNet基础上将temporal stream替换成temporal resolution很高的fastNet。为捕捉运动信息,采样率是spatial stream(这里是slowNet)的a倍(a可取8)，此支不需要编码空间信息,因此宽度可以很小(是slowNet的b倍,b可取1/8)
+- slowNet可以是随意一个CNN(这里用ResNet实例化,在stage(IV)(V)处第一个bottleneck pointwise conv改成 3x1x1 conv,浅层不用temporal convolution的原因与2D/3D混合结构heavy top性能更好相同)
+- fastNet的输入帧数是slowNet的a倍,宽度是b倍的几乎网络,差别是每个stage第一个pointwise都做temporal conv,且自始至终没有temporal stride.
+- fastNet和slowNet采用lateral connection融合.fastNet的feature map向slowNet融合时因形状不兼容,可采取的措施是:
+    - bC,aL,H,W [reshape->] abC,L,H,W ,采用concat融合,当ab=1时,还可以eltwise相加
+    - bC,aL,H,W [temporal采样->] bC,L,H,W 采用concat融合
+    - bC,aL,H,W [strided temporal conv,5x1x1->] bC,L,H,W 采用concat融合.  效果最优,但所有方式差不多
+- 该模型难以使用ImageNet预训练模型,但文中实验说明在kinetics上from scratch和用ImageNet预训练最终效果几乎相同.
 
 ## long range temporal prediction
 要对整个video建模,需要摆脱以往用dense sampling的图像序列(clips or snippets),而应当扩展至整个视频来考虑.
@@ -111,7 +123,7 @@
         - eltwise multiplication
     - encoding的方式有
         - FC
-        - bilinear model: X.review(h*w,c),y = (X.T*X).review(-1), y=sign(y)*sqrt(y),y=normalize(type="L2")特征做矩阵外积,每2个channel做内积后作为编码特征 (文中说使用了tensor sketch的方法给最终的特征降维,不需要直接计算维数很高的外积)
+        - bilinear model: `X.view(h*w,c),y = (X.T*X).view(-1), y=sign(y)*sqrt(y),y=normalize(type="L2")`特征做矩阵外积,每2个channel做内积后作为编码特征 (文中说使用了tensor sketch的方法给最终的特征降维,不需要直接计算维数很高的外积)
 - 训练分成两阶段:
    - (I) finetune softmax(固定CNN和encoding参数)
    - (II) finetune全部
@@ -140,7 +152,10 @@ $$h_{\phi}^d,g_{\theta}^d$$
 
 ### ECO
     Zolfaghari M , Singh K , Brox T . ECO: Efficient Convolutional Network for Online Video Understanding. ECCV 2018.
-
+- 为解决TSN只在temporal维度做late fusion，难以有效发觉时域相关信息,提出在TSN框架下将其consensus function改成3D CNN.其中frame用Inception-V1提取语义信息(直至stage III)，后接stage III后的3D-ResNet-18(空间尺度为18x18),称为ECO-Lite
+- 考虑到有些内容只看静态图片就能判断,与3D-ResNet-18并行的加入Inception-V1剩余部分(对每个segment产生的feature map做ave pooling,即对输入做temporal global ave pooling),最后将两支输出concat后连接softmax,称为ECO-Full.
+- 此文更关注模型效率,对于online应用,因视频不是一开始就全部可见,提出了一种采用sliding window的online预测方式:维护队列Q，每输入N帧,在Q中采样50%个输入c采样50%组成新的队列送入ECO。预测结果做时域指数滑动平均(相当于采样和预测都是EMA形式，靠近此刻越近权重越大)
+- 
 ### TSM
     Lin J , Gan C , Han S . Temporal Shift Module for Efficient Video Understanding. arXiv:1811.08383v1.
 - 使用2D CNN达到了3D CNN的效果,其做法与将group convolution与channel shuffle联用沟通channel之间信息有异曲同工之妙.只不过此时是将channel在temporal维度移动,使2D卷积在channel维计算到了别的时间信息.
@@ -220,6 +235,17 @@ $$h_{\phi}^d,g_{\theta}^d$$
 ### 提升组件: None local module
    
     X. Wang, R. Girshick, A. Gupta, K. He. Non-local Neural Networks for Video Classification CVPR 2018
--
+- 以往卷积操作均是局部操作符,通过逐层堆叠增加感受野的才能捕获全局信息.这里直接对全局信息建模.将一个特征看成一个时空点(具有C维),它是全部特征点的加权平均，即某个是空间xi经过none-local模块变换成yi:
+  $$ y_i = 1/C(x)\Sigma_jf(x_i,x_j)g(x_j)) $$
+  其中C(x)是归一化系数,g(x_j)是pointwise convolution,f(x_i,x_j)可以是:
+    - $$ \exp(x_i^Tx_j) [gaussion]$$
+    - $$ \exp(x_i^T W_\theta^T W_\phi x_j) [embeded gaussion] $$
+    - $$ x_i^T W_\theta^T W_\phi x_j [dot product]$$
+    - $$ ReLU(W_f^Tconcat(W_\thetax_i, W_\phix_j)) [concat] $$
+  以上结果都差不多,第二种类似于softmax,即NLP中的self attention.
+- 为减少计算量, W_\theta,W_\phi,g(x_j)都使通道数减半,且在空间上降采样.为帮助训练和利用预训练模型，None-local模块采用residual形式,即最终输出为:
+  $$z_i=W_zy_i+x_i $$
+  其中W_z恢复通道数,在W_z增加BN层,scale初始化为0，保证起始阶段None-local输出与预训练模型输出完全一致.
+- 实验表明:None-local module对加在网络中的位置不敏感,是视频和静止图像任务均有稳定提升作用.
 
     
