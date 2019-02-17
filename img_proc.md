@@ -1,41 +1,52 @@
-# 图像处理和opencv
+# 图像处理
 　&nbsp;　　　　  　　　　　　　 sqlu@zju.edu.cn
-##引言
-本笔记记录了关于图像的基本概念,方法和实现它们的技术手段:opencv的使用.
- 本文分成以下几个部分:
 
-- 颜色空间(GRAY,RGB,HSV,YUV[NV12,NV21])
-- 图像变换与操作(灰度变换,形态学,卷积,opencv基本数据结构)
-- 图像压缩与输入输出(了解一下图像存储格式,opencv/PIL的IO操作,绘制)
+## 引言
+本笔记记录了关于图像的基本概念,方法和实现它们的技术手段:opencv和PIL的使用.
+ 本文分成以下几个部分:
+- 颜色空间
+- 图像变换与操作
+- 图像压缩与输入输出
 - 背景提取
 - 图像特征点和描述
-- 直方图与跟踪
+- 直方图
 - 光流
-###稀疏光流
-
-###稠密光溜
-
-###采用深度学习计算光流
-    Fischer P., Dosovitskiyz A. , Ilgz E., et al, FlowNet: Learning Optical Flow with Convolutional Networks. ICCV 2015
-    Ilg  E., Mayer N., Saikia T., et.al. FlowNet 2.0: Evolution of Optical Flow Estimation with Deep Networks, CVPR 2017
-
-- 三维视觉
-
-
-
-
-
-RGB: 适用于硬件
-HSV:
-YUV家族(包括YCbCr)
+- 相机模型与立体视觉
+## 颜色空间
+彩色模型是坐标系统和子空间的说明,位于系统中的每种颜色都是由单个点表示.部分彩色模型跟具体硬件相关,这里仅讨论数学模型.
+### RGB
+[Red/Green/Blue]人眼感受光主要由锥状细胞,分别对红绿蓝光做出感受，波长吸收峰值分比为575nm,535nm,445nm.在硬件中也容易对此颜色空间做出控制.
+RGB构成笛卡尔坐标系,立方体斜对角线是灰度级
+### CMYK
+是RGB的补色，也是颜料的三原色(对应颜色原料吸收RGB).为克服将CMY混合产生黑色不纯，单独设置黑色通道K,常用语打印机设备.
+### HSV/HSI
+[Hue/Saturation/Value]符合人对颜色的解释.亮度表达了无色的强度概念,色调是光波混合中与主波长有关的属性,与表示观察者感知的主要颜色(赤橙黄绿蓝靛紫),饱和度指的是相对纯净度,或一种颜色混合白光的数量.色调和饱和度一起称为色度
+将RGB的笛卡尔坐标系以其斜对角线为轴垂直放置,与颜色的平面与红色的夹角为色度,轴与颜色的距离为饱和度.颜色位于轴的高度为I,RGB的最大值为V
+### YUV/YCbCr/YUV420/NV12/NV21/I420/YV12
+Y代表的是亮度，UV代表的是色度,其他都是YUV的存储方式变种，硬解码一般都会输出这种格式.
 Y = 0.299R+0.587G+0.114B
-Cb = 0.564(B-Y)  里面含0.5B  (范围在[-127,127])
-Cr = 0.713(R-Y)  里面含0.5R  (范围在-127~+127)
+Cb = 0.564(B-Y)  里面含0.5B,范围在-127~127
+Cr = 0.713(R-Y)  里面含0.5R,范围在-127~127
 UV分别是Cb+128与Cr+128
-YUV4:4:4 YUV4:2:2 YUV4:1:1，YUV4:2:0是指码流中存储的形式,除了第一种以外,uv都是空间降采样的
-根据存放形式不同，还有plane(YUV分别存放)和pack(交替存放)形式
+- 视觉系统对亮度更敏感而对色度不敏感，因此可以压缩色度通道起到压缩的作用.
+  - 4:4:4表示完全取样
+  - 4:2:2表示2:1的水平取样，垂直完全采样
+  - 4:2:0表示2:1的水平取样，垂直2:1采样
+  - 4:1:1表示4:1的水平取样，垂直完全采样。
+- 根据存放形式不同，还有plane(YUV分别存放,对应CxHxW)和pack(交替存放，对应HxWxC)形式
+  - I420(YU12):先U后V的plane形式,
+  - YV12:先V后U的plane形式
+  - NV12:先U后V的pack形式
+  - NV21:先V后U的pack形式
+### 其他彩色空间
+除上述以外还有XYZ,Lab等颜色空间.不再详述.均可由cv::cvtColor()转换
+## 图像变换与操作
+(灰度变换,形态学,卷积,opencv基本数据结构)
+## 图像压缩与输入输出
+(了解一下图像存储格式,opencv/PIL的IO操作,绘制)
+## 背景提取
 
-混合高斯模型背景建模(参数化模型)
+### 混合高斯模型背景建模(参数化模型)
 认为每个像素点在过去一段时间内符合混合高斯分布
 1.初始化。对第一帧，以随机像素值为均值,给定方差,建立K个高斯模型，权重均为1/k  K一般取3~5
 2.更新。匹配高斯分布(以小于D个标准差为判据,D一般取2.50-3.5)，
@@ -50,7 +61,7 @@ w = (1-a)*w
 创建新的高斯分布，以该像素值为均值，给定方差，替换掉权重最小的高斯分布
 最后对所有权重进行归一化
 3.预测。按照w/std从大到小排序，并且给定背景所占比例T(T>0.7), 当对权重求cumsum时达到T时，匹配分布在T以内高斯时，为背景，否则为前景
-ViBe(Visual Background Extractor)
+### ViBe(Visual Background Extractor)
 认为每个背景像素值在一个样本集在领域内
 1.初始化  对于一个像素点，随机的选择它的邻居点的像素值作为它的模型样本值
 2.更新 保守的更新策略+前景点计数方法。保守的更新策略前景点永远不会被用来填充背景模型。前景点计数：对像素点进行统计，如果某个像素点连续N次被检测为前景，则将其更新为背景点。
@@ -58,3 +69,37 @@ ViBe(Visual Background Extractor)
 在选择要替换的样本集中的样本值时候，随机选取一个样本值进行更新
 3.预测。
 比较样本集合中各点与预测点L2,统计符合条件的点数，小于阈值时为前景，否则为背景
+
+
+## 图像特征点和描述
+## 直方图
+### 概念和计算方式
+### 在跟踪上的应用:meanshift
+## 光流
+
+### 稀疏光流
+
+### 稠密光流
+
+### 采用深度学习计算光流
+    Fischer P., Dosovitskiyz A. , Ilgz E., et al, FlowNet: Learning Optical Flow with Convolutional Networks. ICCV 2015
+    Ilg  E., Mayer N., Saikia T., et.al. FlowNet 2.0: Evolution of Optical Flow Estimation with Deep Networks, CVPR 2017
+    Zhu Y., Lan Z., Newsam S., Hauptmann A,Hidden Two-stream Convolutional Networks for Action Recognition. ACCV 2018
+## 相机模型与立体视觉
+### 相机内参数
+### 相机畸变
+### 外参数矩阵与Rodrigues变换
+### 仿射变换与透视变换
+### 双目相机标定
+### 深度图
+
+
+
+参考书籍:
+学习OpenCV3
+数字图像处理(第三版)
+https://docs.opencv.org/master/
+http://effbot.org/imagingbook/pil-index.htm
+
+
+

@@ -1,7 +1,10 @@
 # Video Recognition 
 &nbsp;   　　　　　　　　　　　　　sqlu@zju.edu.cn
  
-在CIFAR-10,CIFAR-100,ImageNet等数据集上训练的静止图像分类深度神经网络模型进步飞速，且已具有划时代的成果(《Nerual Network archetecture》已详述),但在视频识别和分类上却进展缓慢。除去将2D特征扩展成3D特征的手工设计传统方法,目前深度学习在该领域主要的技术框架可以分成3类,分别是(1)采用3D卷积神经网络;(2)融合手工设计编码运动特征描述符的双流2d网络模型;(3)扩展至整个视频尺度的编码和建模方案.当然这三类并非绝对互斥,类别之内也融入了其余类别的方案.例如3D CNN仍会使用光流输入进行ensemble,或者使用None-local组件扩展3D卷积在时域上的感受野;在长视频建模的框架下仍会采用双流基础模型;双流模型的变种也会融入3d卷积更好的融合两支特征,等等。
+在CIFAR-10,CIFAR-100,ImageNet等数据集上训练的静止图像分类深度神经网络模型进步飞速，且已具有划时代的成果(《Nerual Network archetecture》已详述),但在视频识别和分类上却进展缓慢。除去将2D特征扩展成3D特征的手工设计传统方法,目前深度学习在该领域主要的技术框架可以分成3类,分别是- (1)采用3D卷积神经网络;
+- (2)融合手工设计编码运动特征描述符的双流2d网络模型;
+- (3)扩展至整个视频尺度的编码和建模方案.
+当然这三类并非绝对互斥,类别之内也融入了其余类别的方案.例如3D CNN仍会使用光流输入进行ensemble,或者使用None-local组件扩展3D卷积在时域上的感受野;在长视频建模的框架下仍会采用双流基础模型;双流模型的变种也会融入3d卷积更好的融合两支特征,等等。
 
 ## 大型视频分类数据集: 
 (1)sports-1M:487类体育运动,1M的数据量,视频较长,由于是若监督方式标注的,其中含有错误的标签，也有虽然主题符合，但内容不合适的内容,比如记分牌,比赛解说等)
@@ -241,7 +244,7 @@ $$h_{\phi}^d,g_{\theta}^d$$
     - $$ \exp(x_i^Tx_j) [gaussion]$$
     - $$ \exp(x_i^T W_\theta^T W_\phi x_j) [embeded gaussion] $$
     - $$ x_i^T W_\theta^T W_\phi x_j [dot product]$$
-    - $$ ReLU(W_f^Tconcat(W_\thetax_i, W_\phix_j)) [concat] $$
+    - $$ ReLU(W_f^T concat(W_{\theta}x_i, W_{\phi}x_j)) [concat] $$
   以上结果都差不多,第二种类似于softmax,即NLP中的self attention.
 - 为减少计算量, W_\theta,W_\phi,g(x_j)都使通道数减半,且在空间上降采样.为帮助训练和利用预训练模型，None-local模块采用residual形式,即最终输出为:
   $$z_i=W_zy_i+x_i $$
