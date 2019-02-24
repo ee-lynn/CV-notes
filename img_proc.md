@@ -16,7 +16,7 @@
 彩色模型是坐标系统和子空间的说明,位于系统中的每种颜色都是由单个点表示.部分彩色模型跟具体硬件相关,这里仅讨论数学模型.
 ### RGB
 [Red/Green/Blue]人眼感受光主要由锥状细胞,分别对红绿蓝光做出感受，波长吸收峰值分比为575nm,535nm,445nm.在硬件中也容易对此颜色空间做出控制.
-RGB构成笛卡尔坐标系,立方体斜对角线是灰度级
+RGB构成笛卡尔坐标系,立方体斜对角线是灰度级. 具体表示时,一般每个像素采用3个字节表示,但也有采用2个字节表示,用5,6,5位(RGB565)和5,5,5位(RGB555)表示各个分量
 ### CMYK
 是RGB的补色，也是颜料的三原色(对应颜色原料吸收RGB).为克服将CMY混合产生黑色不纯，单独设置黑色通道K,常用语打印机设备.
 ### HSV/HSI
@@ -34,16 +34,55 @@ UV分别是Cb+128与Cr+128
   - 4:2:0表示2:1的水平取样，垂直2:1采样
   - 4:1:1表示4:1的水平取样，垂直完全采样。
 - 根据存放形式不同，还有plane(YUV分别存放,对应CxHxW)和pack(交替存放，对应HxWxC)形式
-  - I420(YU12):先U后V的plane形式,
-  - YV12:先V后U的plane形式
-  - NV12:先U后V的pack形式
-  - NV21:先V后U的pack形式
-### 其他彩色空间
-除上述以外还有XYZ,Lab等颜色空间.不再详述.均可由cv::cvtColor()转换
+  - YU12(I420):420,先U后V的plane形式
+  - YV12:420,先V后U的plane形式
+  - NV12(YUV420sp):420,Y plane,先U后V的pack(Semi-Planar)形式
+  - NV21:420,Y plane,先V后U的pack形式
+  - YUYV(V422,YUNV,YUY2): 422, 按照YUYV的pack形式
+  - UYVY(Y422,UYNV): 422, 按照UYNV的pack形式
+### 其他彩色空间及相互转换
+除上述以外还有XYZ,Lab等颜色空间.不再详述.均可由```cv::cvtColor(InputArray src, OutputArray dst, int code, int dstCn=0)[or dst=cv.cvtColor(src, code[, dst[, dstCn]]) or PIL.Image.Image.convert(mode=None)，"L"(gray)/"RGB"/"CMYK/YCbCr"```转换，其中code标记转换的两个表示空间，可以在RGB/GRAY/XYZ/YCrCb/HSV/Lab/Luv/HLS(HSI)/YUV family(上面列出的420和422格式)
 ## 图像变换与操作
-(灰度变换,形态学,卷积,opencv基本数据结构)
+### 像素级变换
+
+### 空间滤波与卷积
+
+### 形态学
+- 两种基本操作
+    - 腐蚀
+    - 膨胀
+- 导出操作
+    - 开操作
+    - 闭操作
+    - 击中击不中变换
+- 一些常见使用场景
+
+### opencv基本数据结构
+
 ## 图像压缩与输入输出
-(了解一下图像存储格式,opencv/PIL的IO操作,绘制)
+若将图片在某个颜色空间的数组全部存储将消耗太多存储资源,考虑到编码(不需要都采用a完整字节表示),时间空间(时空上具有一定可预测性),不相关信息(可以取消对视觉效果影响不大的存储)的冗余，有很多压缩方法。图片类型的不同，采取的压缩方式也不同。
+### 一些主要的压缩方法：
+- 霍夫曼编码：霍夫曼编码采用变长编码,图片中出现概率高的像素值采用短的编码,概率小的采用长编码,使得总体上编码长度缩短，平均像素编码长度接近于图片的信息熵(香农第一定理).采用霍夫曼树的构建方式即可.
+- 行程编码:基本思想是存储像素值和连续像素数量,在存储二值图像比较有用.
+- 块变换编码:将一张图片分成多个NxN的不重叠小块,分别使用可逆二维线性变换,对变换后的系数进行截取,量化,编码. 二维线性变换可选取DFT,DCT(离散余弦变换)等.截取时可按照系数方差(区域编码,方差大的系数带有更多信息)或者模(阈值编码,更加常用)大小排序后取前几个.量化可以具有全局阈值/每个子图采用不同阈值，使得子图保留的系数个数相同(最大N编码)/每个子图像每个系数不同(跟量化结合起来,不同位置使用不同的基数求余。缩放量化表格可以使结果具有不同的量化阶梯高度,调节压缩率)
+- 预测编码:基本思想是采用空间或时间上的线索预测图像(e.g.使用前面像素/图像的线性组合),对预测残差进行编码,由于残差的信息熵较原来小,可以使编码长度更短.其中视频一般采用运动补偿编码:独立帧(I)，类似于jpeg,编解码不依赖于其余帧,是生成预测残差的理想起点,可以阻止误差累积.I帧周期性地插入到视频码流中.视频帧被分成NxN的宏块,编码每个宏块相对于前帧的运动向量.基于前一帧的编码帧为P帧(预测称),基于后一帧的编码帧为B帧(双向帧).基于L1的块匹配用于计算运行向量,该向量也可用DCT系数进行量化.
+### 一些主要多媒体文件的压缩标准:
+- JPEG:对图像使用YUV420描述,使用块变换编码,将图像分成不重叠的8X8像素块,每个像素减均值(128)后进行DCT后使用由视觉效果确定的量化基数表格(8x8,亮度和色度不同)进行量化,将量化后系数进行Zig-Zag排列成一维，进一步使用行程编码(非零AC的系数和前面0系数的个数),规范为这种形成编码二元组制定了霍夫曼编码表,DC系数系数是相对前一副图像的差值，同样也有霍夫曼编码表.
+- MPEG-4运动补偿编码,运动向量精度1/4像素.P,B帧宏块16x16(可变),I帧变换块8x8(DCT),.H.264在I帧内还用空间预测编码,且不使用整数变换(可变变换块)而不是DCT
+### 多媒体文件IO
+工具都已经将压缩/解压缩集成,对于文件IO来说是不可见的，工具自动按照文件**内容**进行相应的解码,根据后缀进行编码.
+- opencv文件IO和编辑
+    - 读图片 `Mat cv::imread(const String& filename,int	flags = IMREAD_COLOR)` 按照**HxWxC,其中C中BGR**的顺序解码. *notes* opencv-python读取中文路径的图片时会有问题,使用`cv2.imdecode(np.fromfile(filename,dtype=np.uint8),cv2.IMREAD_UNCHANGED)`
+    - 写图片 `bool cv::imwrite(cconst String& filename,InputArray img,const std::vector< int >& params = std::vector<int>())`,
+    - 读视频 `VideoCapture& videoCapture.operator>>(Mat &image)`/`bool videoCapture.read(OutputArray image) `/`bool videoCapture.grab (); bool videoCapture.retrieve(OutputArray image, int flag=0)`
+    - 写视频 `VideoWriter& videoWriter.operator<<(const Mat& image)`/`void cv::VideoWriter::write(InputArray image)`
+    - 文字   `cv::putText(InputOutputArray img,const String& text,Point	org,int	fontFace,double fontScale,Scalar color,int thickness = 1)`                
+    - 画框   `cv::rectangle(InputOutputArray img,[Point pt1,Point pt2]/Rect rec,,const Scalar& color,int thickness = 1)` 
+- PIL文件IP和编辑
+    - 读图片 `PIL.Image.open()` 
+    - 写图片 `PIL.Image.save()`
+    - 文字 `PIL.ImageDraw.Draw(PIL.Image).text(position, string, options[font])`   #这里再细化一下
+    - 画框 `PIL.ImageDraw.Draw(PIL.Image).rectangle(box, options[outline])`
 ## 背景提取
 
 ### 混合高斯模型背景建模(参数化模型)
