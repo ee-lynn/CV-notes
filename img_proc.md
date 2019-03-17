@@ -9,7 +9,6 @@
 - 图像压缩与输入输出
 - 背景提取
 - 图像特征点和描述
-- 直方图
 - 光流
 - 相机模型与立体视觉
 ## 颜色空间
@@ -42,21 +41,49 @@ UV分别是Cb+128与Cr+128
   - UYVY(Y422,UYNV): 422, 按照UYNV的pack形式
 ### 其他彩色空间及相互转换
 除上述以外还有XYZ,Lab等颜色空间.不再详述.均可由```cv::cvtColor(InputArray src, OutputArray dst, int code, int dstCn=0)[or dst=cv.cvtColor(src, code[, dst[, dstCn]]) or PIL.Image.Image.convert(mode=None)，"L"(gray)/"RGB"/"CMYK/YCbCr"```转换，其中code标记转换的两个表示空间，可以在RGB/GRAY/XYZ/YCrCb/HSV/Lab/Luv/HLS(HSI)/YUV family(上面列出的420和422格式)
-## 图像变换与操作
-### 像素级变换
-
+## 图像变换与操作 
+#### 直方图
+直方图是对图像像素级概率建模的手段,表示为像素在图像中出现的概率,并且不含空间信息.对于偏暗的图像,小像素值概率较高,对比度强的读像素值分布范围较广.
+- 直方图规定化
+为了达到特定的效果，达到指定的直方图,可对像素进行变换.根据概率的观点,就是寻找一个变换函数r->s[记为H]，使概率密度函数从原来的f_r(r)变换成f_s(s)
+根据 
+$$
+\int^{r_0}f_r(r)dr=\int^{H(r_0)}f_s(s)ds -> F_r(r_0)=F_s(H(r_0)) 可得H(r)= F_s^{-1}(F_r)
+$$
+特别地当想要直方图均衡化时(指定的直方图是均匀分布),变换函数为F_r,即按照概率分布函数进行变换.
+- 计算直方图和直方图均衡的方式
+`void cv::calcHist(InputArrayOfArrays images,const std::vector<int>& channels,InputArray mask,OutputArray hist,const std::vector<int >& histSize,const std::vector<float>& ranges,bool accumulate = false)` 类似还有将其中vector换成C风格的指针和指定个数的dims参数的重载版本. 返回的hist是channel.size()维的,每个元素是各个维度上的联合分布像素个数
+在opencv可以直接进行直方图均衡化:
+`void cv::equalizeHist(InputArray src,OutputArray dst)`
+还可以进行将直方图直接投射到原图上:(空间像素转换为该像素[属于一个bin中]的概率),通过追踪目标框hue的直方图投影的重心,即可实现meanshift以及camshift跟踪.
+`void cv::calcBackProject(InputArrayOfArrays images,const std::vector<int>& channels,InputArray hist,OutputArray dst,const std::vector<float>& ranges,double scale)`类似还有将其中vector换成C风格的指针和指定个数的dims参数的重载版本.
+`PIL.Image.histogram()` 返回的是各个像素的个数,多通道时是单个通道边际分布叠加形成的一维列表,在PIL中别的相关操作需要根据得到的直方图自行实现.
 ### 空间滤波与卷积
-
-### 形态学
+卷积作为一种线性操作,是图像空间滤波的概括表述:
+$$ f \star b(x,y) = \Sigma_{s=-a}^{a}\Sigma_{t=-b}^{b}{w(s,t)f(x+s,y+t)} $$
+其中卷积核关于原点的反转已经省略(实际上上实定义了相关操作,但反转操作只是卷积核表示的问题,可以等价起来.这种定义方式也convolution neural neworks中定义方式) 卷积核都是单通道的,处理多通道图片仅在C维上做广播.
+`void cv::filter2D(InputArray src,OutputArray dst,int ddepth,InputArray kernel,Point anchor=Point(-1,-1),double delta=0, int borderType=BORDER_DEFAULT)`
+opencv中还有大量专用的空间滤波函数,如blur,GaussioanBlur,bilateralFilter,Sobel,Laplacian等等.
+`PIL.Image.filter(PIL.ImageFilter.Kernel(size, kernel, scale=None, offset=0))`
+### 形态学(morphology)
 - 两种基本操作
-    - 腐蚀
-    - 膨胀
+    - 腐蚀: 去除图片中小于结构元b尺寸的小高亮区域
+    $$ f\ominus b(x,y) = min_{(s,t)\in b}{f(x+s,y+t)} $$
+    - 膨胀: 联结小于结构元b尺寸的断开小区域
+    $$ f\oplus b(x,y) = max_{(s,t)\in b}{f(x+s,y+t)} $$
+    - 腐蚀和膨胀的关系: 对ROI腐蚀就是对ROI补集的膨胀后再取补集  
+` void cv::dilate(InputArray src,OutputArray dst,InputArray kernel,Point anchor=Point(-1,-1),int iterations=1,int borderType=BORDER_CONSTANT,const Scalar& borderValue=morphologyDefaultBorderValue())`	
+` void cv::erode(InputArray src,OutputArray dst,InputArray kernel,Point anchor=Point(-1,-1),int iterations=1,int borderType=BORDER_CONSTANT,const Scalar& borderValue=morphologyDefaultBorderValue())`
+`PIL.Image.filter(PIL.ImageFilter.MinFilter(size))`
+`PIL.Image.filter(PIL.ImageFilter.MaxFilter(size))`
 - 导出操作
-    - 开操作
-    - 闭操作
-    - 击中击不中变换
-- 一些常见使用场景
-
+    - 开操作: 先腐蚀再膨胀,消除向外凸的小尖角(空间尺寸上和灰度高度上)
+    - 闭操作: 先膨胀在腐蚀,消除向内凹的小尖角(空间尺寸上和灰度高度上),可以看成闭操作的互补
+    - 击中击不中变换: 用两个结构元,一个对图形腐蚀,一个对图形补集膨胀,交集部分.
+    - 帽顶帽底变换: 冒顶变换就是图形减去开操作，剩下向外凸的小尖角，帽底就是闭操作减去图形，剩下向内凹的小尖角.
+统一接口`void cv::morphologyEx(InputArray src,OutputArray dst,int op,InputArray kernel,Point anchor=Point(-1,-1),int iterations=1,int borderType=BORDER_CONSTANT,const Scalar& borderValue=morphologyDefaultBorderValue())`		
+`op = MORPH_ERODE/MORPH_DILATE/MORPH_OPEN/MORPH_CLOSEMORPH_GRADIENT/MORPH_TOPHAT/MORPH_BLACKHAT/MORPH_HITMISS`其中`iterations`指复合操作中基本操作的次数，而不是复合操作的次数,因为根据定义性质，复合操作重复多次并没有用.
+PIL中只能复合基本操作来
 ### opencv基本数据结构
 
 ## 图像压缩与输入输出
@@ -81,10 +108,9 @@ UV分别是Cb+128与Cr+128
 - PIL文件IP和编辑
     - 读图片 `PIL.Image.open()` 
     - 写图片 `PIL.Image.save()`
-    - 文字 `PIL.ImageDraw.Draw(PIL.Image).text(position, string, options[font])`   #这里再细化一下
-    - 画框 `PIL.ImageDraw.Draw(PIL.Image).rectangle(box, options[outline])`
-## 背景提取
-
+    - 文字 `PIL.ImageDraw.Draw(PIL.Image).text(position, string, options[outline,font])   #outline 颜色"rgb(red%,green%,blue%)"/hsl(hue,saturation%,lightness%)",font是PIL.ImageFont实例,可以加载ttf文件：ImageFont.truetype("*.ttf",size)`
+    - 画框 `PIL.ImageDraw.Draw(PIL.Image).rectangle(box, options[outline,fill])  #fill内部填充颜色`
+## 背景建模
 ### 混合高斯模型背景建模(参数化模型)
 认为每个像素点在过去一段时间内符合混合高斯分布
 1.初始化。对第一帧，以随机像素值为均值,给定方差,建立K个高斯模型，权重均为1/k  K一般取3~5
@@ -108,12 +134,10 @@ w = (1-a)*w
 在选择要替换的样本集中的样本值时候，随机选取一个样本值进行更新
 3.预测。
 比较样本集合中各点与预测点L2,统计符合条件的点数，小于阈值时为前景，否则为背景
-
+Video analysis/Improved Background-Foreground Segmentation Methods
 
 ## 图像特征点和描述
-## 直方图
-### 概念和计算方式
-### 在跟踪上的应用:meanshift
+
 ## 光流
 
 ### 稀疏光流
@@ -134,11 +158,11 @@ w = (1-a)*w
 
 
 
-参考书籍:
-学习OpenCV3
-数字图像处理(第三版)
-https://docs.opencv.org/master/
-http://effbot.org/imagingbook/pil-index.htm
+参考资料:
+[1]学习OpenCV3
+[2]数字图像处理(第三版)
+[3]https://docs.opencv.org/master/
+[4]http://effbot.org/imagingbook/pil-index.htm
 
 
 
