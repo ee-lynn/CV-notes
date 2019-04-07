@@ -93,8 +93,14 @@ PIL中只能复合基本操作来实现
 将一个原本是n维的向量用一个n+1维向量来表示,二维点(x,y)的齐次坐标表示为(hx,hy,h),计算得到的齐次坐标点(x,y,z)与(x/z,y/z,1)是同一个点.投影时,在一个投影平面上z都取1.因此透视变换其实只有8个自由变量. (x,y,1) -> (x',y',z') <-> (x'/z',y'/z',1). 而仿射变换因要求保持变换前后平行的关系,确定变换前后3个点后,第4个点便确定了,因此只有6个自由变量.
 #### opencv中api
 `void cv::resize(InputArray	src,OutputArray	dst,Size dsize,double fx = 0,double	fy = 0,int interpolation = INTER_LINEAR)`,其中dsize/fx,fy需要指定其中一套即可.	
-affine()
-perspective()
+稠密仿射变换:`void cv::warpAffine(InputArray src,OutputArray dst,InputArray M,Size dsize,int flags = INTER_LINEAR,int borderMode=BORDER_CONSTANT,const Scalar&	borderValue=Scalar())`		 flags除了设置插值方式外,还可以组合`WARP_INVERSE_MAP`表示M(2x3)矩阵是dst至src的仿射变换矩阵
+稀疏仿射变换:`void cv::transform(InputArray src,OutputArray dst,InputArray m)` *note* m作用在输入的channel维度,当维度相同时,不补1,否则用齐次坐标. m可以是2x2或3x3. src 可以1-4通道.	
+获得仿射变换矩阵:`Mat cv::getAffineTransform(InputArray src,InputArray dst)` src和dst提供三个2维点
+特别地旋转作为一种特殊的仿射变换:`Mat cv::getRotationMatrix2D(Point2f center,double angle,double scale)`
+稠密透视变换`void cv::warpPerspective(InputArray src,OutputArray dst,InputArray M,Size dsize,int flags = INTER_LINEAR,int borderMode=BORDER_CONSTANT,const Scalar& borderValue = Scalar())`		M为3x3单应性矩阵,最后的结果将重新化为齐次坐标Z=1的平面.
+稀疏透视变换`void cv::perspectiveTransform(InputArray src,OutputArray dst,InputArray m)` m可以是3x3(2D点)/4x4(3D点)
+获得透视变换矩阵:`Mat cv::getPerspectiveTransform(InputArray src,InputArray dst,int solveMethod=DECOMP_LU)`	src,dst提供四个2维点
+`findHomography`是一种优化版本,即提供大于四个点，解超定方程.
 #### PIL中api
 `PIL.Image.resize(size,filter)` filter可取`Image.NEAREST(default)/Image.BILINEAR/Image.BICUBIC/Image.ANTIALIAS`
 `PIL.Image.transfrom(size, method, data, filter)` 
@@ -174,18 +180,22 @@ Ptr<_Tp>提供了类似shared_ptr<_Tp>的智能指针,将自我进行内存管�
 比较像素点与其样本集合中各点的L2距离,统计符合条件的点数,小于阈值时为前景,否则为背景.
 
 ### opencv中提供的接口
-<opencv2/video/background_segm.hpp>
-<opencv2/bgsegm.hpp>
-Video analysis/Improved Background-Foreground Segmentation Methods
+opencv中的背景建模在`<opencv2/video/background_segm.hpp>`共同的基类为`cv::BackgroundSubtractor`提供了`virtual void cv::apply((InputArray image,OutputArray fgmask,double learningRate=-1)`，其子类有:
+cv::BackgroundSubtractorKNN(非参数模型),cv::BackgroundSubtractorMOG2(参数模型)
+调用方式均是先createBackgroundSubstractor<xxx>(param),然后调用apply得到前景fgmask.创建后还可以get/set各种参数.
 
 ## 图像特征点和描述
-
+总结SIFT,HOG。opencv中的框架实现一下
 ## 光流
 
 ### 稀疏光流
-
+cv::SparseOpticalFlow
+`virtual void cv::SparseOpticalFlow::calc(InputArray prevImg,InputArray nextImg,InputArray prevPts,InputOutputArray nextPts,OutputArray status OutputArray err=cv::noArray())`
+cv::SparsePyrLKOpticalFlow
 ### 稠密光流
-
+<opencv2/video/tracking.hpp> cv::DenseOpticalFlow
+`virtual void cv::DenseOpticalFlow::calc(InputArray I0,InputArray I1,InputOutputArray flow)`
+cv::DISOpticalFlow cv::FarnebackOpticalFlow  cv::optflow::DualTVL1OpticalFlow,cv::VariationalRefinedment
 ### 采用深度学习计算光流
     Fischer P., Dosovitskiyz A. , Ilgz E., et al, FlowNet: Learning Optical Flow with Convolutional Networks. ICCV 2015
     Ilg  E., Mayer N., Saikia T., et.al. FlowNet 2.0: Evolution of Optical Flow Estimation with Deep Networks, CVPR 2017
