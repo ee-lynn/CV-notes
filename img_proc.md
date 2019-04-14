@@ -41,8 +41,10 @@ UV分别是Cb+128与Cr+128
   - UYVY(Y422,UYNV): 422, 按照UYNV的pack形式
 ### 其他彩色空间及相互转换
 除上述以外还有XYZ,Lab等颜色空间.不再详述.均可由```cv::cvtColor(InputArray src, OutputArray dst, int code, int dstCn=0)[or dst=cv.cvtColor(src, code[, dst[, dstCn]]) or PIL.Image.Image.convert(mode=None)，"L"(gray)/"RGB"/"CMYK/YCbCr"```转换，其中code标记转换的两个表示空间，可以在RGB/GRAY/XYZ/YCrCb/HSV/Lab/Luv/HLS(HSI)/YUV family(上面列出的420和422格式)
-## 图像变换与操作 
-#### 直方图
+
+## 图像变换与操作
+
+### 直方图
 直方图是对图像像素级概率建模的手段,表示为像素在图像中出现的概率,并且不含空间信息.对于偏暗的图像,小像素值概率较高,对比度强的读像素值分布范围较广.
 - 直方图规定化
 为了达到特定的效果，达到指定的直方图,可对像素进行变换.根据概率的观点,就是寻找一个变换函数r->s[记为H]，使概率密度函数从原来的f_r(r)变换成f_s(s)
@@ -154,6 +156,7 @@ Ptr<_Tp>提供了类似shared_ptr<_Tp>的智能指针,将自我进行内存管�
 
 ### 混合高斯模型背景建模(参数化模型)
 
+   Zich...
 每个像素以混合高斯分布建模.
 1.初始化:对第一帧，以随机像素值为均值,给定方差,建立K个高斯模型，权重w均为1/K,K一般取3~5
 2.更新:匹配高斯分布(以小于D个标准差为判据,D一般取2.50-3.5)，
@@ -170,7 +173,6 @@ Ptr<_Tp>提供了类似shared_ptr<_Tp>的智能指针,将自我进行内存管�
 ### ViBe(Visual Background Extractor,非参数化模型)
 
     O. Barnich and M. Van Droogenbroeck. ViBe: A universal background subtraction algorithm for video sequences. In IEEE Trans. Image Processing, 2011.
-    Brutzer S , Hoferlin B , Heidemann G . Evaluation of background subtraction techniques for video surveillance, CVPR 2011
 认为每个背景像素以邻域像素组成的样本集表示,通过概率更新样本集和距离阈值来判断.
 1.初始化:对于一个像素点，随机地选择它的邻域像素值作为它的模型样本值
 2.更新:保守的更新策略或前景点计数方法。每一个背景点有φ的概率去更新自己的模型样本值，同时也有φ的概率去更新它的邻居点的模型样本值。在选择要替换的样本集中的样本值时随机选取一个样本值进行更新
@@ -187,18 +189,77 @@ cv::BackgroundSubtractorKNN(非参数模型),cv::BackgroundSubtractorMOG2(参数
 ## 图像特征点和描述
 总结SIFT,HOG。opencv中的框架实现一下
 ## 光流
-
+光流算法的理想输出是两针图像中每个像素的位移矢量。图像中每个像素都是用这种方法,则通常称其为"稠密光流",仅仅对图像中某些点的子集计算则被称为"稀疏光流".
+opencv中光流计算均在`<opencv2/video/tracking.hpp>`中
 ### 稀疏光流
-cv::SparseOpticalFlow
-`virtual void cv::SparseOpticalFlow::calc(InputArray prevImg,InputArray nextImg,InputArray prevPts,InputOutputArray nextPts,OutputArray status OutputArray err=cv::noArray())`
-cv::SparsePyrLKOpticalFlow
+- Lucas-Kanade算法的三个假设:(1)亮度恒定:像素值加上速度后值恒定;(2)时间较快,运动微小:所求位移矢量就是速度矢量;(3)空间一致性:空间小窗口内位移矢量相同,用于正则化，环节孔径效应(透过一个小孔观察更大无图的运动,无法得知真实运动信息,只知道垂直边缘的运动速度).
+$$
+\nabla I \cdot u=-dI/dt  (由假设1,2导出)
+$$
+结合假设3,在小窗口(例如5x5)中各个像素均满足以上等式,用最小二乘法求的速度矢量.
+迭代:因为像素不变假设,复用空间梯度.使用计算得到的矢量叠加上原始图像得到中间图像,修正像素时间梯度,修正计算速度矢量
+$$
+u=u_{pre}-(\nabla I)^{-1} dI/dt
+$$
+金字塔式算法:
+构建图像金字塔后,由粗到细逐层计算,粗尺度的计算结果上采样后作为细化层的初值估计.
+- opencv api
+稀疏光流的共同基类为`cv::SparseOpticalFlow`,计算的统一接口为:`virtual void cv::SparseOpticalFlow::calc(InputArray prevImg,InputArray nextImg,InputArray prevPts,InputOutputArray nextPts,OutputArray status OutputArray err=cv::noArray())`
+其中金字塔LK光流类为:`cv::SparsePyrLKOpticalFlow`.
+`static Ptr<SparsePyrLKOpticalFlow> cv::SparsePyrLKOpticalFlow::create(Size winSize=Size(21, 21),int maxLevel=3,TermCriteria crit=TermCriteria TermCriteria::COUNT+TermCriteria::EPS, 30, 0.01),int flags=0,double minEigThreshold=1e-4)` 指定窗口大小,金字塔层数,迭代结束条件,和flag = OPTFLOW_USE_INITIAL_FLOW | OPTFLOW_LK_GET_MIN_EIGENVALS,特征值用于评估最小二乘法问题的奇异性(或者理解为harris测度过滤不好的跟踪点)
+另外一个接口函数直接计算
+`void cv::calcOpticalFlowPyrLK(InputArray prevImg,InputArray nextImg,InputArray prevPts,InputOutputArray nextPts,OutputArray status,OutputArray err,Size winSize=Size(21, 21),int maxLevel=3,TermCriteria criteria=TermCriteria(TermCriteria::COUNT+TermCriteria::EPS, 30, 0.01),int flags=0,double minEigThreshold=1e-4)`.		
 ### 稠密光流
-<opencv2/video/tracking.hpp> cv::DenseOpticalFlow
-`virtual void cv::DenseOpticalFlow::calc(InputArray I0,InputArray I1,InputOutputArray flow)`
-cv::DISOpticalFlow cv::FarnebackOpticalFlow  cv::optflow::DualTVL1OpticalFlow,cv::VariationalRefinedment
-### 采用深度学习计算光流
+- 总变分法(使得匹配后的两张图像上每个点尽可能相同_
+$$
+\min_{u(x,y),v(x,y)} \int \psi(I(x,y)-I(x+u,y+v))dxdy
+$$
+其中$$\psi$$是误差函数,根据不同需求可取L1,L2函数.
+  - 对纯色区域只要求尽可能匹配是不够的,还需要加入正则项
+$$
+\min_{u(x,y),v(x,y)} \int \phi(\nabla u, \nabla v)dxdy
+$$
+于是总体函数为
+$$
+\min_{u(x,y),v(x,y)} \int [\psi(I(x,y)-I(x+u,y+v))+\lambda \phi(\nabla u, \nabla v)]dxdy
+$$
+  - dual TV-L1
+
+        Zach C , Pock T , Bischof H . A Duality Based Approach for Realtime TV-L1 Optical Flow, 2007.
+
+早期的H-S算法是上述优化问题中误差函数都定义为L2,再使用变分法得到欧拉方程经过数值解法解,效果不是很好.TV-L1将误差函数都设为L1，且将上述问题拆成两个问题.
+引入新优化变量v，优化问题变成
+$$
+\min_{u,v} \int [|I(x+u)-I(x)|+\lambda |\nabla u|+(u-v)^2/\theta]dxdy
+$$
+再次将I(x+u)-I(x)在x+v附近用一阶tailor展开成线性 \rho =I(x+v)+dI(x+v)/dx(u-v)-I(x),代入优化目标.因为u与v很接近,采用交替求解的方式:
+
+  - step1:固定v，求u
+$$
+\min_{u} \int [\lambda |\nabla u|+(u-v)^2/\theta]dxdy
+$$
+
+  - step2:固定u，求v
+$$
+\min_{v} \int [|\rho (v)|+\lambda (u-v)^2/\theta]dxdy
+$$
+第二个子问题是pixelwise的,可以分别求解.求解方式就是讨论\rho的符号,就可以得到解析解(实际上在数值上根据u得到v的过程中,\rho绝对值小于一定阈值就直接认为是0,该阈值由更新步长之间比较可以得出),记为为TH操作
+第一个子问题是denoising问题,有现成的方法.迭代公式为:
+$$
+u = v - \theta div p  \quad  p\in R^{2} \\
+p = (p+\tau/\theta\nabla u))/(1+\tau/\theta|\nabla u|)
+$$
+实际求解时候,构建金字塔结构,在最粗的尺度上初始化u=0,每个尺度上u用上个尺度resize初始化,v初始化为u,p初始化为(0,0),反复使用TH->更新v->更新p 迭代固定次数得到一个尺度的光流.
+- opencv api
+稠密光流共同基类为`cv::DenseOpticalFlow`,统一接口为`virtual void cv::DenseOpticalFlow::calc(InputArray I0,InputArray I1,InputOutputArray flow)`
+可以使用的方法有`cv::DISOpticalFlow; cv::FarnebackOpticalFlow;  cv::optflow::DualTVL1OpticalFlow; cv::VariationalRefinedment`
+- 采用深度学习计算光流
     Fischer P., Dosovitskiyz A. , Ilgz E., et al, FlowNet: Learning Optical Flow with Convolutional Networks. ICCV 2015
     Ilg  E., Mayer N., Saikia T., et.al. FlowNet 2.0: Evolution of Optical Flow Estimation with Deep Networks, CVPR 2017
+
+
+
+
     Zhu Y., Lan Z., Newsam S., Hauptmann A,Hidden Two-stream Convolutional Networks for Action Recognition. ACCV 2018
 ## 相机模型与立体视觉
 ### 相机内参数
