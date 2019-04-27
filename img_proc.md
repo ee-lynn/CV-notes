@@ -2,8 +2,10 @@
 　&nbsp;　　　　  　　　　　　　 sqlu@zju.edu.cn
 
 ## 引言
+
 本笔记记录了关于图像的基本概念,方法和实现它们的技术手段:opencv和PIL的使用.
  本文分成以下几个部分:
+
 - 颜色空间
 - 图像变换与操作
 - 图像压缩与输入输出
@@ -11,17 +13,27 @@
 - 图像特征点和描述
 - 光流
 - 相机模型与立体视觉
+
 ## 颜色空间
+
 彩色模型是坐标系统和子空间的说明,位于系统中的每种颜色都是由单个点表示.部分彩色模型跟具体硬件相关,这里仅讨论数学模型.
+
 ### RGB
+
 [Red/Green/Blue]人眼感受光主要由锥状细胞,分别对红绿蓝光做出感受，波长吸收峰值分比为575nm,535nm,445nm.在硬件中也容易对此颜色空间做出控制.
 RGB构成笛卡尔坐标系,立方体斜对角线是灰度级. 具体表示时,一般每个像素采用3个字节表示,但也有采用2个字节表示,用5,6,5位(RGB565)和5,5,5位(RGB555)表示各个分量
+
 ### CMYK
+
 是RGB的补色，也是颜料的三原色(对应颜色原料吸收RGB).为克服将CMY混合产生黑色不纯，单独设置黑色通道K,常用语打印机设备.
+
 ### HSV/HSI
+
 [Hue/Saturation/Value]符合人对颜色的解释.亮度表达了无色的强度概念,色调是光波混合中与主波长有关的属性,与表示观察者感知的主要颜色(赤橙黄绿蓝靛紫),饱和度指的是相对纯净度,或一种颜色混合白光的数量.色调和饱和度一起称为色度
 将RGB的笛卡尔坐标系以其斜对角线为轴垂直放置,与颜色的平面与红色的夹角为色度,轴与颜色的距离为饱和度.颜色位于轴的高度为I,RGB的最大值为V
+
 ### YUV/YCbCr/YUV420/NV12/NV21/I420/YV12
+
 Y代表的是亮度，UV代表的是色度,其他都是YUV的存储方式变种，硬解码一般都会输出这种格式.
 Y = 0.299R+0.587G+0.114B
 Cb = 0.564(B-Y)  里面含0.5B,范围在-127~127
@@ -39,12 +51,15 @@ UV分别是Cb+128与Cr+128
   - NV21:420,Y plane,先V后U的pack形式
   - YUYV(V422,YUNV,YUY2): 422, 按照YUYV的pack形式
   - UYVY(Y422,UYNV): 422, 按照UYNV的pack形式
+
 ### 其他彩色空间及相互转换
+
 除上述以外还有XYZ,Lab等颜色空间.不再详述.均可由```cv::cvtColor(InputArray src, OutputArray dst, int code, int dstCn=0)[or dst=cv.cvtColor(src, code[, dst[, dstCn]]) or PIL.Image.Image.convert(mode=None)，"L"(gray)/"RGB"/"CMYK/YCbCr"```转换，其中code标记转换的两个表示空间，可以在RGB/GRAY/XYZ/YCrCb/HSV/Lab/Luv/HLS(HSI)/YUV family(上面列出的420和422格式)
 
 ## 图像变换与操作
 
 ### 直方图
+
 直方图是对图像像素级概率建模的手段,表示为像素在图像中出现的概率,并且不含空间信息.对于偏暗的图像,小像素值概率较高,对比度强的读像素值分布范围较广.
 - 直方图规定化
 为了达到特定的效果，达到指定的直方图,可对像素进行变换.根据概率的观点,就是寻找一个变换函数r->s[记为H]，使概率密度函数从原来的f_r(r)变换成f_s(s)
@@ -156,7 +171,8 @@ Ptr<_Tp>提供了类似shared_ptr<_Tp>的智能指针,将自我进行内存管�
 
 ### 混合高斯模型背景建模(参数化模型)
 
-   Zich...
+   Zoran Zivkovic, Ferdinand van Heijden. Efficient adaptive density estimation per pixel for the atsk of background subtraction. 2006
+
 每个像素以混合高斯分布建模.
 1.初始化:对第一帧，以随机像素值为均值,给定方差,建立K个高斯模型，权重w均为1/K,K一般取3~5
 2.更新:匹配高斯分布(以小于D个标准差为判据,D一般取2.50-3.5)，
@@ -187,7 +203,63 @@ cv::BackgroundSubtractorKNN(非参数模型),cv::BackgroundSubtractorMOG2(参数
 调用方式均是先createBackgroundSubstractor<xxx>(param),然后调用apply得到前景fgmask.创建后还可以get/set各种参数.
 
 ## 图像特征点和描述
-总结SIFT,HOG。opencv中的框架实现一下
+
+### 特征点(角点)
+
+- 一些具有辨识能力的点,特别地可应用到多视角图片的匹配等；
+harris测度:一个点作为关键点,位置移动一下像素会变化很多.基于这个思想构造
+$$
+\Sigma x,y \in (w,h) w_xy[I(x+\delta x,y+\delta y)-I(x,y)]^2
+$$
+在一个小窗口(w,h)内，在w_xy系数加权下L2距离. 线性化后展开后可以表示为\delta x,\delta y的二次型，其hessian阵H的特征值表征了角点好坏. harris测度定义为
+$$
+det(H)/tr^2(H)
+$$
+即两个特征值的比值,太小时不是一个好的角点(Harris),或者仅判断较小的特征值大于一定阈值就是一个好的特征点(Shi-Tomasi)
+- opencv api 
+`void cv::goodFeaturesToTrack(InputArray image,OutputArray corners, int maxCorners,double qualityLevel,double minDistance,InputArray mask=noArray(),int blockSize=3,bool useHarrisDetector=false,double k=0.04)`就是找出这样的角点,其中使用评价标准在`minDistance`做非极大值抑制(NMS),最多输出`maxCorners`个角点,`qualityLevel`是最低可接受的评价标准与最好角点的评价标准的比值.`blockSize`是计算角点hessian时使用的窗口大小`useHarrisDetector`表示使用评价标准是harris还是Shi-Tomasi,`k`是阈值.
+- 找到角点后,还需要构造一个特征向量来表征这个角点,成为特征描述符.
+
+### 尺度不变特征转换(Scale-invariant feature transform或SIFT)
+
+SIFT描述符具有平移、缩放、旋转不变性，同时对光照变化、仿射及投影变换也有一定的不变性,由四部分构成.
+- 高斯差分（DoG）滤波：搜索所有尺度上的图像位置。通过高斯微分函数来识别潜在的对于尺度和旋转不变的兴趣点。
+  - 高斯模板在空间方向是可分的,二维模板被拆成了x,y两个方向的两个模板,加快计算.
+  - 形成金字塔时,产生几组(octave,共o组)为一个分辨率,每组内又有几层(interval,共s层).每一组都是上一组倒数第3层的降采样1倍(选取原因见方差分布规律).
+  - 对高斯平滑的图像做拉普拉斯算子,可以近似用不同方差的高斯算子得到.因此在每组内相邻层做差分,得到差分图.因下一步需要确定极值需要上下图，因此差分图需要n+2个,对应地,需要s=n+3层
+  - 一组内方差逐次放大2^(1/n)倍.因共有s=n+3层,倒数第三层对应正好是2*\sigma,降采样一倍后正好恢复方差.
+  - 两个高斯滤波级联,等价于方差和的方差高斯滤波. 摄像机拍摄时会对图像形成一定的平滑,定义这种平滑方差为0.5,规定第一组第一层方差为1.6,则对摄像机拍摄的图像直接做方差为1.52的高斯滤波即可.实际操作中,为得到更多特征点,将图像resize上采样一倍,作为金字塔低端,此时相机方差为1,第一层方差为1.25(\sqrt{1.6^2-1^2})
+
+- 尺度空间的极值检测和关键点位置确定：对DoG金字塔中的每一层，进行尺度空间的极值检测(极大值[正]和极小值[负])，把每一个极值点作为候选点，在每个候选的位置上，通过一个拟合精细的模型来确定位置和尺度。关键点的选择依据于它们的稳定程度。
+  - step 1: 在某一层上选择极值,与该层8邻域,上下层9个点比较,得到极值
+  - step 2: 采用牛顿法迭代得到亚像素的极值点(关于x,y,\sigma三种变量).牛顿法迭代时需要采用差分求梯度和hessian.其中亚像素偏移大于0.5格时更换插值起点.过滤掉迭代次数超越限制,极值绝对值小于阈值的极值点.
+   - 使用Harris测度过滤掉测度小于0.1的特征点
+
+- 关键点方向确定：基于图像局部的梯度方向，分配给每个关键点位置一个或多个方向。所有后面的对图像数据的操作都相对于关键点的方向、尺度和位置进行变换，从而提供对于这些变换的不变性。
+  - 以特征点所在层的1.5\sigma 窗口内统计像素的梯度和方向.梯度计算采用中心差分.梯度采用方差为1.5\sigma 的高斯加权
+  - 计算梯度方向的直方图,统计的是加权后的梯度模.直方图的峰值作为该特征点的方向.对于多峰直方图,次峰大于主峰80%的也作为方向,此时将该特征点复制一份,增强特征的鲁棒性.当然也需要在直方图中插值(二次插值)得到具体多少度.
+- 构建关键点特征描述符：在每个关键点周围的内，在选定的尺度上测量图像局部的梯度。这些梯度被变换成一种表示，这种表示允许比较大的局部形状的变形和光照变化。
+  - 得到特征点h(x,y,\theat)后,在图上画BxB(4x4)个网格,每个网格由3\sigma个像素点组成.该网格旋转至\theta(所有像素均由插值得到).并且计算BxB网格内每个网格的梯度方向直方图(以特征点距离为高斯加权,直方图均分为8个方向),得到8xBxB维描述符.
+  - 为了去除光照变化的影响，需要对它们进行归一化处理，对于图像灰度值整体漂移，图像各点的梯度是邻域像素相减得到，所以也能去除。非线性光照，相机饱和度变化对造成某些方向的梯度值过大因此设置门限值(向量归一化后，一般取0.2)截断较大的梯度值。然后再进行一次归一化处理，提高特征的鉴别性。
+- SIFT与其他特征的关系
+  - 构造描述符时,采用的就是HOG的方式,可以把SIFT理解为尺度和方向自适应的HOG.
+  - 因在过滤特征点时也用到了Harris测度，因此SIFT也是一种Harris角点
+  - SURF是改进版的SIFT:框架与SIFT相同,只不过细节上用计算更加高效的技术来替代.如不构建金字塔而是用一组不同大小的盒式滤波器,微分用Haar小波代替,描述符仅分为4个分量,x,y梯度和与x,y梯度绝对值和等等
+- opencv api
+  - `<opencv2/features2d.hpp>`中各种形式的特征都有统一的基类接口`cv::Feature2D`
+使用`static Ptr<xxx>create(params)`来创建,有基类实现多态.
+  - `virtual void detect(InputArray image,std::vector<KeyPoint>& keypoints,InputArray mask=noArray())`
+  `virtual void detect(InputArrayOfArrays images,std::vector<std::vector<KeyPoint>>&keypoints,InputArrayOfArrays masks=noArray())`
+  detect计算特征点,第二个是第一个的批量计算版本
+  - `virtual void compute(InputArrayOfArrays images,std::vector<std::vector<KeyPoint>>&keypoints,OutputArrayOfArrays descriptors)`
+  `virtual void compute(InputArrayOfArrays images,std::vector<std::vector<KeyPoint>>&keypoints,OutputArrayOfArrays descriptors)`
+  compute根据特征点计算描述符(特征向量),第二个是第一个的批量计算版本
+  - `virtual void detectAndCompute(InputArray image,InputArray mask,std::vector<KeyPoint >& keypoints,OutputArray descriptors, bool useProvidedKeypoints=false)`
+  将detect和compute一起做了,一般情况需要描述符时直接调用这个函数更加高效,不需要重复计算中间变量.
+  -与特征相关的概念还有
+  `cv::KeyPoint()`表示特征点的基本类型,`CV:::DMatch`表示特征匹配的基本类型,
+`cv::DescriptorMatcher`用于匹配特征点的基类,`void cv::drawKeypoints(InputArray image, const std::vector<KeyPoint> &keypoints, InputOutputArray outImage, const Scalar& color=Scalar::all(-1), DrawMatchesFlags flags=DrawMatchesFlags::DEFAULT)`可视化特征点
+
 ## 光流
 光流算法的理想输出是两针图像中每个像素的位移矢量。图像中每个像素都是用这种方法,则通常称其为"稠密光流",仅仅对图像中某些点的子集计算则被称为"稀疏光流".
 opencv中光流计算均在`<opencv2/video/tracking.hpp>`中
@@ -254,19 +326,95 @@ $$
 稠密光流共同基类为`cv::DenseOpticalFlow`,统一接口为`virtual void cv::DenseOpticalFlow::calc(InputArray I0,InputArray I1,InputOutputArray flow)`
 可以使用的方法有`cv::DISOpticalFlow; cv::FarnebackOpticalFlow;  cv::optflow::DualTVL1OpticalFlow; cv::VariationalRefinedment`
 - 采用深度学习计算光流
-    Fischer P., Dosovitskiyz A. , Ilgz E., et al, FlowNet: Learning Optical Flow with Convolutional Networks. ICCV 2015
-    Ilg  E., Mayer N., Saikia T., et.al. FlowNet 2.0: Evolution of Optical Flow Estimation with Deep Networks, CVPR 2017
 
+      Fischer P., Dosovitskiyz A. , Ilgz E., et al, FlowNet: Learning Optical Flow with Convolutional Networks. ICCV 2015
+      Ilg  E., Mayer N., Saikia T., et.al. FlowNet 2.0: Evolution of Optical Flow Estimation with Deep Networks, CVPR 2017
 
+  - FlowNet使用CNN有监督学习来预测光流，输入为前后帧,输出光流.
+  FlowNetS(imple):就是encoder-decoder,先降采样后升采样,最终得到光流输出.其中升采样feature map还会concat对应大小降采样的feature map 
+  FlowNetC(orrelation):考虑光流的定义,引入了correlation操作去匹配特征
+  对于featuremap1中中心位置x1(stride s1),计算在D=2d+1邻域内featuremap2中中心位置x2(stride s2)的卷积,卷积核大小K=2k+1.输出结果安排为([D/s2]+1)^2x([h/s1]+1)x([w/s1]+1).
 
+  - FlowNetS网络结构
 
-    Zhu Y., Lan Z., Newsam S., Hauptmann A,Hidden Two-stream Convolutional Networks for Action Recognition. ACCV 2018
+        input 6xhxw
+        Conv1 7x7/2  64   ReLU
+        Conv2 5x5/2  128  ReLU
+        Conv3 5x5/2  256  ReLU
+        Conv3_1 3x3  256  ReLU
+        Conv4 3x3/2  512  ReLU
+        Conv4_1 3x3  512  ReLU
+        Conv5 3x3/2  512  ReLU
+        Conv5_1 3x3  512  ReLU
+        Conv6 3x3/2  1024 ReLU
+        ConvTrans5 4x4/2 512
+        concat Conv5_1              ->ConvTrans1 4x4/2 2
+        ConvTrans4 4x4/2 256  
+        concat Conv4_1 ConvTrans1   ->ConvTrans2 4x4/2 2
+        ConvTrans3 4x4/2 128  
+        concat Conv3_1 ConvTrans2   ->ConvTrans3 4x4/2 2
+        ConvTrans2 4x4/2 64
+        concat Conv2 ConvTrans3
+        Conv 3x3  2  ReLU
+        bilinear
+
+  - FlowNetC网络结构
+    image1,image2两支单独输入,直到conv3.权重共享.
+    correlation输出441通道,concat image1 conv3再conv 3x3 输出的32通道,合计473通道。之后与FlowNetS相同,上采样的conv2来自image1这一支.
+    总参数数量与FlowNetS相同
+
+    为了训练深度网络，只做了flying chairs数据集,该数据集试是将椅子(808张椅子,每张62个视角)放在背景图(共964张来自Flickr,切成4块)上，共生成了22872个pair
+    数据增强:平移,旋转,缩放,高斯噪声,亮度对比度gamma扰动.
+    FlowNetC比FlowNetS更容易拟合到训练集,且因为d的设置,在特大位移上性能略逊一筹.
+
+    FlowNet2.0是FlowNet高度调优的升级版,包括3个方面:
+    (1)训练时使用不同数据集,且性能与数据集的顺序相关：Flying chairs仅包括平面移动,Things3D是更实际的3D运动.训练时,schedule比flowNew更长,且首先在chairs数据集上训练,再在Things3D上finetune效果更好.即首先学习颜色匹配，再学习3d运动效果好，直接上来学困难的3d运动效果逊之.
+    (2)多个网络级联,并且引入warping操作: 网络级联,底层网络先训练,再固定权重,提供给后级I2(x+u,y+v),|I2(x+u,y+v)-I1(x,y)|,uv(x,y)。因为级联,可减少通道数加快速度.可以得到一系列模型.
+    (3)融合了一个专门针对小位移设计的网络:为应对小位移效果不好的问题,额外建立了一个数据集、原来chairs的光流是按照Sintel中直方图设计的,现在按照UCF-101的直方图构造,配合均匀背景,称为ChairsSDHom(small displacement homogeneous)。将FlowNetS骨架中7x7/2改成3x3 3x3/2 3x3 5x5改成3x3/2 3x3, conv6后添加conv6_1 3x3 1024  转置卷积后都添加3x3卷积. 称为FlowNetSD。融合网络输入两支光流大小,光流,误差,再加上Image1,共(1+2+1)*2+3=11输入通道。结构:
+
+        Conv 3x3     64
+        conv 3x3/2   64
+        conv 3x3     128
+        conv 3x3/2   128
+        conv 3x3     128     -> Conv 3x3 2
+        convtrans 4x4/2  32
+        conv 3x3         32  -> Conv 3x3 2
+        convtrans 4x4/2  16
+        conv 3x3         16
+        Conv 3x3         2
+
+    FlowNetCSS+FlowNetSD融合称为FlowNet2
+
+        Zhu Y., Lan Z., Newsam S., Hauptmann A,Hidden Two-stream Convolutional Networks for Action Recognition. ACCV 2018
+
+  - MotionNet与flowNet最大差别在于其将计算光流按照基本概念建模成一个无监督学习问题
+  损失函数包括三部分组成:
+    - 像素重建误差:
+    $$
+    \Sigma_i^j \Sigma_j^w \rho(I_1(i,j)-I_2(i+u(i,j),j+v(i,j)))/hw
+    $$
+    - 平滑性惩罚:
+    $$
+    \rho(\nabla_x u)+\rho(\nabla_y u)+\rho(\nabla_x v)+\rho(\nabla_y v)
+    $$ 
+    - 重建结构误差:
+    $$
+    1-\Sigma \mu_1\mu_2\sigma_1\sigma_2/[(\mu_1^2+\mu_2^2)(\sigma_1^2+\sigma_2^2)]
+    $$
+    其中\mu \sigma 均是8x8像素块内的均值方差,下标1,2分别是前帧和后帧与光流重建的图像中按照stride=8切割的图像块.MotionNet整个网络结构与FlowNetSD相同,在升采样中每个尺度上产生的光流均计算损失.
+
 ## 相机模型与立体视觉
+
 ### 相机内参数
+
 ### 相机畸变
+
 ### 外参数矩阵与Rodrigues变换
+
 ### 仿射变换与透视变换
+
 ### 双目相机标定
+
 ### 深度图
 
 
