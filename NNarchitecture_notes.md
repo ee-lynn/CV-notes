@@ -560,7 +560,8 @@ intuition:　既然前期研究结果显示神经网络深度很重要，那么�
         FC
 
 #### MobileNet V2　　　　　　　 
-        Mark Sandler, Andrew Howard, Menglong Zhu, Andrey Zhmoginov, Liang-Chieh Chen. "MobileNetV2: Inverted Residuals and Linear Bottlenecks". arXiv:1801.04381v3
+        
+        Mark Sandler, Andrew Howard, Menglong Zhu, Andrey Zhmoginov, Liang-Chieh Chen. "MobileNetV2: Inverted Residuals and Linear Bottlenecks". CVPR 2018
     
 - intuition:在feature维度较少时,使用ReLU会破坏信息,且难以恢复.而当先升维经过ReLU再降维,信息将大概率保留. 因此本文提出了一种上边厚,下边薄的inverted　bottleneck. 本来botttleneck设计初衷就是为了降低3x3卷积的计算量,但是现在将其改造成seperable convolution后计算量减少很多,不再需要bottleneck减少输入通道数.
 - 基本组成单元: inverted bottleneck. 就是一个上边厚，下面小的bottleneck(post activation)，其中3x3卷积都是separable convolution. 为了降低信息损失，在通道数较少的eltwise　add之后移除了ReLU.
@@ -615,6 +616,46 @@ intuition:　既然前期研究结果显示神经网络深度很重要，那么�
         inverted bottleneck 3x3 320 t = 6
         Ave pool
         FC 
+
+#### mobileNet V3
+    
+    Andrew Howard, Mark Sandler, Grace Chu, Liang-Chieh Chen, Bo Chen, Mingxing Tan, Weijun Wang, Yukun Zhu, Ruoming Pang, Vijay Vasudevan, Quoc V. Le, Hartwig Adam. "Searching for MobileNetV3", arXiv:1905.02244
+
+在mobileNet V2基础上修改
+- 将第一层Conv 3x3/2 32 改成输出16个
+- 最后一个stage  
+          inverted bottleneck 320　t=6
+          Conv 1x1　1280 (为了特征丰富性)
+    这个inverted bottleneckxian先扩大在缩小，再扩大最后pooling.这里将Ave pooling直接接在Conv1x1扩大处,消除了缩小扩大反复的过程
+    取消了depthwise Conv3x3和projection Conv1x1和 skip connection，即
+
+          Conv 1x1 960
+	  Ave pooling
+	  Conv 1x1 1280
+
+- 非线性激励(swich)x*sigmoid(x)对网络性能有帮助,这里将sigmoid改造成分段线性函数 ReLU6(x+3)/6
+    考虑到降采样后，elwise操作减少一半，在网络后阶段(Stage IV及之后)使用swish，前期仍使用ReLU.
+- 每个expansion系数和输出通道数都是经过NAS搜索出来的，下面是large的结构
+
+        Conv 3x3/2 16
+        inverted bottleneck 16 t=1
+        --------------------------    stage　II  x 2
+        inverted bottleneck 24 t=2.66,3
+        --------------------------    stage　III x 3  +SE
+        inverted bottleneck 40 t=1.8,3,3
+        --------------------------    stage IV x 4 
+        inverted bottleneck 80 t=3,2.5,2.3,2.3
+        ---------------------------     x2            +SE
+        inverted bottleneck 112 t=4.285,6
+        ---------------------------                  +SE
+        inverted bottleneck 160 t=4.2
+        --------------------------    stage V x 2     +SE
+        inverted bottleneck 160 t=4.2,6
+        -------------------------- 
+        Conv 1x1   960
+        Ave pool
+        Conv 1x1　1280
+        FC
 
 ### ShuffleNet family
 #### shuffleNet V1
