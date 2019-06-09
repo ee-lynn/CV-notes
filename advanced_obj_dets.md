@@ -61,10 +61,15 @@
 
 - 逐步完善
 - Zhang S , Wen L , Bian X , et al. "Single-Shot Refinement Neural Network for Object Detection". CVPR 2018
+
+
 - Cai Z , Vasconcelos N . "Cascade R-CNN: Delving into High Quality Object Detection".	arXiv:1712.00726
+  - 传统的检测器确定正负样本时以IOU>0.5为判断依据，如要提高检测精度，需要提高该阈值，但该阈值提高时,正样本迅速减少，使得训练难以进行.
+  - 一种提高精度的方法是在后处理中不断迭代定位(iterative box):即得到检测框后,迭代将其作为proposal,使用回归和分类参数得到检测框。这种做法没有考虑到训练时分类和回归参数是根据IOU阈值进行的,以低阈值训练得到参数在高IOU时性能并不好.
+  - 一般而言,proposal与真值的IOU将在检测层后提高,因此在训练时就采用多stage,且不断提高IOU阈值,那么推断时就天然具有逐步完善结构,且因目标框质量不断改善,正样本数量不会减少,逐渐变高的IOU阈值也使得不同阶段的分类和回归参数得到针对性的训练.解决了上述的问题.
+  - cascading R-CNN:faster R-CNN的一种扩展,要点是多个stage中IOU阈值不断提高,检测头不共享权值,训练时逐stage进行,推理时结构与训练相同。
 
 - 改善多尺度目标检测性能
- 
   - 多层特征融合改善小目标检测 feature pyramid network
 
       Lin T Y , Dollar P , Girshick R , et al. Feature Pyramid Networks for Object Detection. CVPR 2017.
@@ -77,10 +82,16 @@
     - 为每个scale分配不同尺度的anchor,每个尺度宽高比为1,2,1/2，，在每个尺度上加Conv 3x3和两支Conv 1x1做为RPN. anchor与GT有最大的IOU或者IOU大于0.7的正样本,IOU小于0.7的为负样本.
     - RPN出来的结果尺寸到相应层去做ROI pooling [k0+log2(sqrt(wh)/224)],原本ResNet在stage IV上做为k0=4，现在加了2,3,5三个stage. ROI pooling之后加了两层FC(1024)+{regressor(4xC)+classifier(C+1)}，训练得到的两阶段检测器称为feature pyramid network.
   
+  - TridentNet
 
-  - 多尺度网架
-    - 分支结构: Li Y , Chen Y , Wang N , et al. "Scale-Aware Trident Networks for Object Detection". arXiv.1901.01892
-    - 对block修改: Liu S , Huang D , Wang Y . "Receptive Field Block Net for Accurate and Fast Object Detection". ECCV 2018
+        Li Y , Chen Y , Wang N , et al. "Scale-Aware Trident Networks for Object Detection". arXiv.1901.01892
+
+    - 使用图像金字塔计算量太大,而像FPN的特征金字塔不同尺度的目标特征因深度不同,语义表达能力不同。本文使得不同尺度特征表达能力相同.通过多只相似的扩张卷积,调整dialation rates来实现感受野的变化.为了不增加参数,使参数训练更加充分,同时减少模型过拟合的风险，模型在不同尺度的分支上参数共享,仅仅是dialation rates不同.
+    - scale aware training: 不同尺度分支的预测上,设置sqrt(wh)区间[l,h],当anchor位于区间内时,分配至这一支。推理时,首先过滤掉位于区间外的结果，然后多只一起做NMS.(在coco上根据s,m,l来设置,并有一定重合)
+  
+  - RBFNet
+
+        Liu S , Huang D , Wang Y . "Receptive Field Block Net for Accurate and Fast Object Detection". ECCV 2018
 
 
 
@@ -103,21 +114,42 @@ $$
       Li, Buyu , Y. Liu , and X. Wang . "Gradient Harmonized Single-stage Detector". arXiv:1811.05181
 
   
-- 改造置信度,使其意义更加明确
+- 改造置信度,使其意义更加明确，优化了直接使用置信度来后处理的NMS
   - IOUNet
+
+
   - ConRetinaNet
-  - 
+     Tao Kong, Fuchun Sun, Huaping Liu, Yuning Jiang, Jianbo Shi."Consistent Optimization for Single-Shot Object Detection". arXiv:1901.06563v2
+    - 单阶段检测器训练和推理时存在不协调,使得置信度难以很好表示检测的结果:置信度按照anchor分类得到,目标框却依据回归参数对anchor进行了偏移.这种不协调会带来一些列问题,比如,物体比较紧密时,anchor覆盖的区域的类别和回归后的检测框类别不一致;或者背景anchor回归后定位较为精确,但因为置信度较低在NMS中被抑制.
+    - 解决方法非常直观: 将分类loss改成回归后目标框的该有的标签. 为了训练的稳定,实际使用的分类loss使用anchor的标签和回归后目标框的标签计算的loss和
+    - 还可以将单阶段检测器输出结果进一步refine,即检测头输出更多支,是在前面预测结果框的基础上进一步refine.该文中添加了一个回归分支,对前一阶段的目标框进一步计算,实验表明这种配置效果最优.[此时框的两次回归与两次分类实际上又是不协调的,分类结果对应于第一次回归框,但再添加一次分类,性能略微变差了] 总体的损失函数就是多个阶段的分类和回归损失的和，分类共享权值,各阶段输出同一个标签. 当然单阶段通过框的进一步修正存在的困难在于不像两阶段那样，可以通过ROI pooling调整特征的位置,单阶段的特征是与像素对齐的. 
 
+  - soft nms
+  
+       Bodla N , Singh B , Chellappa R , et al. "Improving Object Detection With One Line of Code". arXiv:1704.04503v2 
 
-- 改进NMS
-
+  - softer nms
       He Y , Zhu C , Wang J , et al. "Bounding Box Regression with Uncertainty for Accurate Object Detection". arXiv:2018.08545
-      Bodla N , Singh B , Chellappa R , et al. "Improving Object Detection With One Line of Code". arXiv:1704.04503v2 
+    - 一方面,在现有数据集中发现某些目标的目标框标注具有不确定性(遮挡,歧义,标注不正确等造成),因此自然而然想到在目标框回归中引入不确定性，用于表征目标框的确定性.
+    - 在传统NMS中使用分类置信度进行抑制，使有些定位更好的框被抑制掉了，因此使用目标框的确定性来抑制更合理,并且可以利用重合在一起的多个框的信息.
+    - 目标框参数化为四个角点(定义方式类似于传统的中心点),回归输出角点建模为方差为\sigma，均值为输出的高斯分布，方差跟坐标一样平行作为一支输出。真值的分布为dirac函数，因此只需要优化他们的交叉熵即可,交叉熵为(x_g-x_e)^2/(2\sigma^2)+log(\sigma^2)/2 考虑到\sigma始终为正,采用\alpha = log(\sigma^2)表示，且将L2替换成smoothL1,更容易优化. 于是回归任务损失函数为 exp(-\alpha)(|x_g-x_e|-0.5)+\alpha/2 刚开始初始化时,alpha支路输出至非常小，跟传统的smoothL1回归相同.    
+    - 后处理时,NMS中抑制不再使用置信度,考虑到IOU越大,预测方差sigma_i越小定位应当越准确,因此在NMS中具有与最大置信度的框IOU大于0的坐标权重为 exp(-(IOU(b_i,b)-1)^2/t)/\sigma_i与最大的置信度框的坐标进行加权平均. 其中t是个超参数(可取0.005~0.05，衰减需要快一些)
 
 - 改造anchor(anchor free detector)
 
-
   Law H , Deng J . "CornerNet: Detecting Objects as Paired Keypoints". ECCV 2018
+  - 将目标检测问题建模成为预测目标左上/右下两个点的问题.这样绕开了anchor的使用,从而避免了anchor数巨大带来的计算量和一些列超参数设置.
+  - 模型将为每一类 预测左上/右下两个关键点,为每个关键点预测一个embeding,超像素偏移。根据embeding之间距离最短将左上/右下关键点组成目标框,偏移用于恢复下采样feature map像素位置的小数部分
+  - 预测关键点时,左上和右下分成两部分进行,每个真值都采用高斯软化后的标签.因在关键点真值一定范围内,都可以恢复质量较好的目标框,根据IOU至少为0.3,可以计算出一个半径,在关键点真值的该半径内，都可以生成目标框，从而将方差设置为1/3的该半径,真值mask被设置为e^(-\beta(x^2+y^2)/2\sigma^2). 分割关键点时loss设置为focal loss形式，使用预测概率动态降低负样本的权重.
+  - 为左上和右下关键点预测超像素偏移时,类间共享,采用smoothL1 loss
+  - 为关键点预测embedings时,使用一维标量。两个关键点的emdebing之差的绝对值采用pull-push loss优化：关键点应当组合时,emdeding使用L2 loss(pull),不应组合是，使用hinge loss(push) (均除以加和项数归一化)
+  - 考虑到角点邻域内没有信息难以定位，在预测环节中加入鲜先验信息: 左上角需要朝右和下看，右下角需要朝左和上看，提出了corner pooling。对于左上关键点预测的两个feature，分别求向右和向下的max pooling然后相加，对于右下关键点预测的两个feature，分别求向左和向下的max pooling然后相加.  
+  - 预测环节：传统residual block中第一个conv 3x3 改成了平行两支卷积后作pooling再相加.再经过两个conv 3x3后,三支Conv 1x1分别输出heatmap(C),offsets(1)和embeding(C)
+  - backbone: 因为预测关键点，采用分割常用的hourglass结构：先采用Conv 7x7/2 128, Conv 3x3/2 256，然后是两个hourglass，hourglass下采样5次,中间是4个 residual block，上采样时，采用最近邻upsample+conv，还具有skip connection。 训练时不单独添加中间信息对第一个hourglass进行监督(实验发现有损性能),而是添加了跨过整第一个hourglass的skip connection(输入图片和第一个hourglass输出都经过conv 1x1后相加送入第二个hourglass) backbone上加两个预测环节头，分别为左上和右上的预测。
+  - 后处理：首先对两个heatmap使用3x3 max pooling，然后挑选出Top 100的关键点,使用对应offset修正，然后使用embeding之间距离(L1)进行过滤，当距离大于0.5或者关键点不属同一类别被过滤掉. 置信度只用两个关键点置信度的平均值，使用原图和horizontal flip图前向后的预测结果框进行soft nms得到最终结果。
+
+
+
 	Kaiwen Duan, Song Bai, Lingxi Xie, Honggang Qi, Qingming Huang, Qi Tian. "CenterNet: Keypoint Triplets for Object Detection". arXiv:1904.08189
   Xingyi Zhou, Dequan Wang, Philipp Krähenbühl. "Objects as Points". arXiv:1904.07850
   Tao Kong, Fuchun Sun, Huaping Liu, Yuning Jiang, Jianbo Shi. "FoveaBox: BeyondAnchor-basedObjectDetector". arXiv:1904.03797
