@@ -37,7 +37,7 @@
         eltwise sum
     - Deconvolution的方式: 上采样后与前面等大分辨率feature map融合:
         feature map(smaller)                  feature map(larger)
-        convolutiontranspose 2x2 512          Conv 3x3  512
+        convolutiontranspose 2x2/2 512          Conv 3x3  512
         conv 3x3      512                     Conv 3x3  512
         Eltwise sum/prob         
     - 与SSD类似,在ResNet-101 stageV中stride=2改为1,3x3卷积dialation均改为2.扩大分辨率同时保持感受野不变.
@@ -66,14 +66,15 @@
   - 实验的notes:(1)mask支路输出单通道(类别不可知)性能下降非常少,但采用softmax性能下降很大,分类还是应放在整体分类支路完成;(2)backbone一直采用到ResNet stage V后,性能比stage IV更好了,跟以往目标检测与平移不变性认识有些矛盾,主要是RIOAlign解决了特征对齐，在大stride时仍没有偏移. (3)采用ROIAlign后检测器性能提升较多,再加mask多任务训练后,AP也提升一些(~1个点)
 
 - 逐步完善
-- Zhang S , Wen L , Bian X , et al. "Single-Shot Refinement Neural Network for Object Detection". CVPR 2018
+  - Zhang S , Wen L , Bian X , et al. "Single-Shot Refinement Neural Network for Object Detection". CVPR 2018
+    - 将单阶段检测器改造成1.5阶段.即虽然跟两阶段检测器相同有proposal，但仍跟单阶段检测器那样将ROI与feature map直接绑定
+    - backbone与DSSD相似,在SSD支路上(bottom-up),在各个尺度上进行proposal,即加上RPN head做anchor的regressor和fg/bg的二分类，滤掉大量简单proposal.然后在转置卷积分支上(top-down),在各个尺度上进行对前序proposal的refine[与普通检测器头相同,做坐标回归和多分类].整个网络直接端到端进行proposal和refine的优化
 
-
-- Cai Z , Vasconcelos N . "Cascade R-CNN: Delving into High Quality Object Detection".	arXiv:1712.00726
-  - 传统的检测器确定正负样本时以IOU>0.5为判断依据，如要提高检测精度，需要提高该阈值，但该阈值提高时,正样本迅速减少，使得训练难以进行.
-  - 一种提高精度的方法是在后处理中不断迭代定位(iterative box):即得到检测框后,迭代将其作为proposal,使用回归和分类参数得到检测框。这种做法没有考虑到训练时分类和回归参数是根据IOU阈值进行的,以低阈值训练得到参数在高IOU时性能并不好.
-  - 一般而言,proposal与真值的IOU将在检测层后提高,因此在训练时就采用多stage,且不断提高IOU阈值,那么推断时就天然具有逐步完善结构,且因目标框质量不断改善,正样本数量不会减少,逐渐变高的IOU阈值也使得不同阶段的分类和回归参数得到针对性的训练.解决了上述的问题.
-  - cascading R-CNN:faster R-CNN的一种扩展,要点是多个stage中IOU阈值不断提高,检测头不共享权值,训练时逐stage进行,推理时结构与训练相同。
+  - Cai Z , Vasconcelos N . "Cascade R-CNN: Delving into High Quality Object Detection".	arXiv:1712.00726
+    - 传统的检测器确定正负样本时以IOU>0.5为判断依据，如要提高检测精度，需要提高该阈值，但该阈值提高时,正样本迅速减少，使得训练难以进行.
+    - 一种提高精度的方法是在后处理中不断迭代定位(iterative box):即得到检测框后,迭代将其作为proposal,使用回归和分类参数得到检测框。这种做法没有考虑到训练时分类和回归参数是根据IOU阈值进行的,以低阈值训练得到参数在高IOU时性能并不好.
+    - 一般而言,proposal与真值的IOU将在检测层后提高,因此在训练时就采用多stage,且不断提高IOU阈值,那么推断时就天然具有逐步完善结构,且因目标框质量不断改善,正样本数量不会减少,逐渐变高的IOU阈值也使得不同阶段的分类和回归参数得到针对性的训练.解决了上述的问题.
+    - cascading R-CNN:faster R-CNN的一种扩展,要点是多个stage中IOU阈值不断提高,检测头不共享权值,训练时逐stage进行,推理时结构与训练相同。
 
 - 改善多尺度目标检测性能
   - 多层特征融合改善小目标检测 feature pyramid network
@@ -101,8 +102,8 @@
     - 使用人类的视觉系统的研究成果来指导CNN的结构设计,在计算量较少的情况下性能尽可能好.与之接近的工作是Inception,它使用多分支不同大小的卷积核捕捉不同尺度的特征;ASPP(Atrous Spatial Pooling)使用不同的dialation rate捕捉不同尺度的特征; 这里提出的receptive field block(RFB)就是将Inception和ASPP融合起来,使用Inception-ResNet的基本多分支结构,在Conv 3x3后面加Conv 3x3 dialation rate = 3,在两层Conv 3x3后面加Conv 3x3 dialation rate = 5.
     - RFBNet将RFB取代SSD中VGG backbone后面feature map大于5的两个卷积(再后面feature map小于5难以做Conv5x5仍用普通卷积)，在Conv4_3后面接一个减少感受野的RFB(RFB-s：两层Conv 3x3分支改成Conv 3x3,单层Conv 3x3改成两支Conv 1x3 和Conv 3x1,其余不变)。RFBNet在SSD baseline上有明显的提升
 
-- 针对loss的改进
-  - 正负样本不均衡 focal loss
+- 针对训练过程的改进
+  - focal loss及RetinaNet
 
        Lin, T. Y. , Goyal, P. , Girshick, R. , He, K. , & Dollár, Piotr. Focal loss for dense object detection. IEEE Transactions on Pattern Analysis & Machine Intelligence, 2017.
 
@@ -115,9 +116,14 @@ $$
     - 在FPN上每个feature level上连接两支subnet,分别是分类和回归。均是4层Conv 3x3再加 Conv 3x3输出，分类输出CK通道，回归输出4K通道,K为anchor个数,每个feature level安排3个anchor,3个宽高比共9个anchor.参数形式与Faster RCNN相同.回归系数是每个anchor共享(与别的检测器不同).C个类别用sigmoid表示,因此无背景类且每个类别独立,都是2分类问题.
     - 为了稳定训练,分类最后一层bias初始化为 -log((1-p)/p)),p取0.01,这样初始输出前景的置信度便为0.01,新增的卷积层均用高斯初始化.训练得到的单阶段检测器称为RetinaNet
   
-  - GH
+  - Gradient harmonized mechanism
+  
       Li, Buyu , Y. Liu , and X. Wang . "Gradient Harmonized Single-stage Detector". arXiv:1811.05181
-
+  - 与focal loss相同，都是为了解决训练one shot detector中dense sampling anchor时正负样本比例,难易样本比例相差悬殊.GMH是用梯度批量归一化方式来解决这个问题,使各种norm的梯度贡献均衡,这样比例小样本的就不会被淹没
+  - GHM-C(classifier)
+    - 对于cross-entropy loss的norm是有界的,将[0,1]分成M(30)个bin,分别统计每个bin中样本个数,属于每个bin中的梯度均用该频率去归一化。比例较大的梯度权重便自动降低,比例小的梯度权重自动增加.在每个mini batch中对梯度模直方图使用EMA来平滑和维护,抑制可能出现的极端值.
+  - GHM-R(regressor)
+    - smoothL1 loss的梯度在x*,x_gt达到一定距离时就是1,不是一个连续变化的值,难以使用梯度模的直方图.因此将regression的loss改造成 sqrt((x*-x_gt)^2+\miu^2)-\miu  \miu取0.02. 这样梯度便是[0,1]内连续变化的值，可以计算直方图,使用方式与GHM-C相同
   
 - 改造置信度,使其意义更加明确，优化了直接使用置信度来后处理的NMS
   - IOUNet
@@ -132,6 +138,9 @@ $$
   - soft nms
   
        Bodla N , Singh B , Chellappa R , et al. "Improving Object Detection With One Line of Code". arXiv:1704.04503v2 
+    - greedy NMS 循环将与最大置信度的box IOU大于一定阈值的box置信度直接置零.一方面置信度越高的box不一定位置就越精确，另一方面这种做法在同一种类目标重叠较多时会抑制正确的目标框,简单提高NMS的IOU阈值造成的误检会更多，难以解决这个问题。 还有一种特殊情况是某些误检框会同时框多个在一起的目标,这种框较大，与单个目标框的IOU都不是很大,使用NMS难以抑制(每个目标抑制一次,每次都打不到抑制的IOU阈值).
+    - soft NMS 改造了粗暴的greedy NMS做法,根据框之间的IOU对置信度进行一定惩罚,直至小于输出阈值被抑制掉. 抑制的方式是IOU的连续函数,可以用线性(conf = conf*(1-IOU))或者高斯函数(conf = conf*(1-exp(-IOU/\sigma)),\sigma与greedy NMS阈值差不多即可)表示
+    - 采用soft NMS后密集的目标能都出来,只是临近的置信度会低一些,也可以抑制掉多个目标的大框,因为它被单个目标多次抑制到了阈值下.
 
   - softer nms
       He Y , Zhu C , Wang J , et al. "Bounding Box Regression with Uncertainty for Accurate Object Detection". CVPR 2019
@@ -153,17 +162,25 @@ $$
 
 
   Law H , Deng J . "CornerNet: Detecting Objects as Paired Keypoints". ECCV 2018
-  - 将目标检测问题建模成为预测目标左上/右下两个点的问题.这样绕开了anchor的使用,从而避免了anchor数巨大带来的计算量和一些列超参数设置.
-  - 模型将为每一类 预测左上/右下两个关键点,为每个关键点预测一个embeding,超像素偏移。根据embeding之间距离最短将左上/右下关键点组成目标框,偏移用于恢复下采样feature map像素位置的小数部分
-  - 预测关键点时,左上和右下分成两部分进行,每个真值都采用高斯软化后的标签.因在关键点真值一定范围内,都可以恢复质量较好的目标框,根据IOU至少为0.3,可以计算出一个半径,在关键点真值的该半径内，都可以生成目标框，从而将方差设置为1/3的该半径,真值mask被设置为e^(-\beta(x^2+y^2)/2\sigma^2). 分割关键点时loss设置为focal loss形式，使用预测概率动态降低负样本的权重.
-  - 为左上和右下关键点预测超像素偏移时,类间共享,采用smoothL1 loss
-  - 为关键点预测embedings时,使用一维标量。两个关键点的emdebing之差的绝对值采用pull-push loss优化：关键点应当组合时,emdeding使用L2 loss(pull),不应组合是，使用hinge loss(push) (均除以加和项数归一化)
-  - 考虑到角点邻域内没有信息难以定位，在预测环节中加入鲜先验信息: 左上角需要朝右和下看，右下角需要朝左和上看，提出了corner pooling。对于左上关键点预测的两个feature，分别求向右和向下的max pooling然后相加，对于右下关键点预测的两个feature，分别求向左和向下的max pooling然后相加.  
-  - 预测环节：传统residual block中第一个conv 3x3 改成了平行两支卷积后作pooling再相加.再经过两个conv 3x3后,三支Conv 1x1分别输出heatmap(C),offsets(1)和embeding(C)
-  - backbone: 因为预测关键点，采用分割常用的hourglass结构：先采用Conv 7x7/2 128, Conv 3x3/2 256，然后是两个hourglass，hourglass下采样5次,中间是4个 residual block，上采样时，采用最近邻upsample+conv，还具有skip connection。 训练时不单独添加中间信息对第一个hourglass进行监督(实验发现有损性能),而是添加了跨过整第一个hourglass的skip connection(输入图片和第一个hourglass输出都经过conv 1x1后相加送入第二个hourglass) backbone上加两个预测环节头，分别为左上和右上的预测。
-  - 后处理：首先对两个heatmap使用3x3 max pooling，然后挑选出Top 100的关键点,使用对应offset修正，然后使用embeding之间距离(L1)进行过滤，当距离大于0.5或者关键点不属同一类别被过滤掉. 置信度只用两个关键点置信度的平均值，使用原图和horizontal flip图前向后的预测结果框进行soft nms得到最终结果。
+    - 将目标检测问题建模成为预测目标左上/右下两个点的问题.这样绕开了anchor的使用,从而避免了anchor数巨大带来的计算量和一些列超参数设置.
+    - 模型将为每一类 预测左上/右下两个关键点,为每个关键点预测一个embeding,超像素偏移。根据embeding之间距离最短将左上/右下关键点组成目标框,偏移用于恢复下采样feature map像素位置的小数部分
+    - 预测关键点时,左上和右下分成两部分进行,每个真值都采用高斯软化后的标签.因在关键点真值一定范围内,都可以恢复质量较好的目标框,根据IOU至少为0.3,可以计算出一个半径,在关键点真值的该半径内，都可以生成目标框，从而将方差设置为1/3的该半径,真值mask被设置为e^(-\beta(x^2+y^2)/2\sigma^2). 分割关键点时loss设置为focal loss形式，使用预测概率动态降低负样本的权重.
+    - 为左上和右下关键点预测超像素偏移时,类间共享,采用smoothL1 loss
+    - 为关键点预测embedings时,使用一维标量。两个关键点的emdebing之差的绝对值采用pull-push loss优化：关键点应当组合时,emdeding使用L2 loss(pull),不应组合是，使用hinge loss(push) (均除以加和项数归一化)
+    - 考虑到角点邻域内没有信息难以定位，在预测环节中加入鲜先验信息: 左上角需要朝右和下看，右下角需要朝左和上看，提出了corner pooling。对于左上关键点预测的两个feature，分别求向右和向下的max pooling然后相加，对于右下关键点预测的两个feature，分别求向左和向下的max pooling然后相加.  
+    - 预测环节：传统residual block中第一个conv 3x3 改成了平行两支卷积后作pooling再相加.再经过两个conv 3x3后,三支Conv 1x1分别输出heatmap(C),offsets(1)和embeding(C)
+    - backbone: 因为预测关键点，采用分割常用的hourglass结构：先采用Conv 7x7/2 128, Conv 3x3/2 256，然后是两个hourglass，hourglass下采样5次,中间是4个 residual block，上采样时，采用最近邻upsample+conv，还具有skip connection。 训练时不单独添加中间信息对第一个hourglass进行监督(实验发现有损性能),而是添加了跨过整第一个hourglass的skip connection(输入图片和第一个hourglass输出都经过conv 1x1后相加送入第二个hourglass) backbone上加两个预测环节头，分别为左上和右上的预测。
+    - 后处理：首先对两个heatmap使用3x3 max pooling，然后挑选出Top 100的关键点,使用对应offset修正，然后使用embeding之间距离(L1)进行过滤，当距离大于0.5或者关键点不属同一类别被过滤掉. 置信度只用两个关键点置信度的平均值，使用原图和horizontal flip图前向后的预测结果框进行soft nms得到最终结果。
 
-
+  - FSAF module
+      
+      Chenchen Zhu, Yihui He, Marios Savvides. "Feature Selective Anchor-Free Module for Single-Shot Object Detection". CVPR 2019
+   
+    - 将目标检测问题建模成预测像素是目标出现的概率和该像素距离目标边界距离.
+    - 目标出现的概率:与检测头类似,在特征上加一层卷积层(C通道)+sigmoid,直接预测该像素有该类别目标的概率.真值框投射到该feature map后,在在真值框宽高比例范围[0,\sigma_1)为正样本,[\sigma_1,\sigma_2)为忽略,[\sigma_2,1)及真值框外部均为负样本.采用focal loss训练. (文中提到小目标真值实例优先级更高,没明白必要性:若采用sigmoid类别之间没有竞争性,可以同时兼顾，但也可以每个像素仅分配一个类别,文中还提到忽略区域在多尺度特时相邻特征也忽略,这在真值投射时候就已经保证了)
+    - 目标框形状: 在特征上加一层卷积层(4通道)+ReLU.使用四个参数,但意义是像素距边界框的距离，然后可计算与真值框的IOU,直接对正样本区域IOU进行优化.最终形成目标框时,左上坐标为(i-x1,j-x2)，右下坐标为(i+x3,j+x4)，置信度就是(i,j)的目标出现概率.
+    - 在多尺度预测训练时,采用一种online feature selection的方式,即在各个feature level上前向,反传loss最小的那个level. 推理时不需要这个方式,可直接在NMS层面将多余的结果抑制掉
+    - FSAF module可与anchor based检测器采用multitask的形式一起训练,可以获得更好的性能
 
 	Kaiwen Duan, Song Bai, Lingxi Xie, Honggang Qi, Qingming Huang, Qi Tian. "CenterNet: Keypoint Triplets for Object Detection". arXiv:1904.08189
   Xingyi Zhou, Dequan Wang, Philipp Krähenbühl. "Objects as Points". arXiv:1904.07850
