@@ -405,25 +405,144 @@ $$
 
 ## 相机模型与立体视觉
 
-### 相机内参数
+### 相机内在参数[固有参数]
 
-### 相机畸变
+- 几何模型:将小孔成像物理模型中成像平面放到小孔前面,成像大小相同但不再倒立.f'是焦距(物理尺寸)再乘上换算系数变成f(图像尺寸相关,像素/毫米)。进一步考虑成像各项不均匀和偏心,得到相机的几何模型:
+$$
+  x_{screen} = f_xX/Z+c_x \\
+  y_{screen} = f_yY/Z+c_y
+$$
+- 内参矩阵: 应用齐次坐标后,便有投影变换
+$$
+  M = \left(
+  \begin{array}{ccc} f_x & 0 & c_x \\ 0 & f_y & c_y \\ 0 & 0 & 1 \end{array}
+  \right) \\
+  Q = \left( X  Y  Z \right)^T \\
+  q = MQ
+$$
+q是投影后像素坐标的齐次坐标形式,可约去z形成二维坐标.
+- 畸变:使用透镜而不是小孔能更快汇集更多光线从而快速成像,但会引入畸变.
+  - 径向畸变:光线弯曲引起,远离透镜中心的光线比靠近中心的光线弯曲更多.建模成关于r的泰勒展开,参数化为[k1,k2,k3]
+$$  
+  x_{correct} = x(1+k1r^2+k2r^4+k4r^6) \\
+  y_{correct} = y(1+k1r^2+k2r^4+k4r^6) \\
+$$
+  - 切向畸变:安装过程引起,透镜平面与成像平面不平行.参数化为[p1,p2]
+$$  
+  x_{correct} = x+x(2p_1xy+p_2(r^2+2x^2)) \\
+  y_{correct} = y+y(p_1(r^2+2y^2)+2p_2xy) \\
+$$
+  - 畸变作用在相机坐标上(投影前)
 
-### 外参数矩阵与Rodrigues变换
+### 外参数 
+- 实际物体位于世界坐标系,需要转换到相机坐标系中,一个坐标系统变换到另一个坐标系统,需要经历旋转(R)和平移(T).
+- R可以分解为绕着空间三个轴(X,Y,Z)的旋转
+$$
+  R_x(\theta) = \left(
+  \begin{array}{ccc} 1 & 0 & 0 \\ 0 & cos(\theta) & sin(\theta) \\ 0 & -sin(\theta) & cos(\theta) \end{array}
+  \right) \\
+  R_y(\theta) = \left(
+  \begin{array}{ccc} cos(\theta) & 0 & -sin(\theta) \\ 0 & 1 & 1 \\ sin(\theta) & 0 & cos(\theta) \end{array}
+  \right) \\
+  R_z(\theta) = \left(
+  \begin{array}{ccc} cos(\theta) & sin(\theta) & 0 \\ -sin(\theta) & cos(\theta) & 0 \\ 0 & 0 & 1 \end{array}
+  \right) \\
+  R = R_x(\theta_1)R_y(\theta_2)R_z(\theta_3)
+$$
+- 用Rodrigues变换表示旋转:向量的模表示旋转的弧度,方向表示旋转轴.向量表示和矩阵表示的旋转采用Rodrigues变换互相转化.
 
-### 仿射变换与透视变换
+### 单目相机标定
 
-### 双目相机标定
+- 理论分析:给定棋盘格,其中有N个角点,K个视图.则构成2NK个约束[每个点坐标有2个分量],共有参数4+6k(忽略畸变,4个内参,每个视图6个外参),参数小于约束的情况下,可得(N-3)K>=2.实际上一个单应性矩阵只需要4个点就能确定，因此无论角点个数N多少,有效N都不超过4.因此 K>=2,即至少有2个视图才能标定.实际使用时,一般使用7x7棋盘格10多个视图.
+- 把棋盘格放在z=0的世界坐标系中,则
+$$
+\left(\begin{array}{ccc} x \\ y \\ z \end{array}\right)  = M\left(\begin{array}{ccc}r1 & r2 & r3 & t \end{array}\right) \left(\begin{array}{ccc} X \\ Y \\ 0 \\ 1 \end{array}\right) = M\left(\begin{array}{ccc}r1 & r2 & t\end{array}\right)\left(\begin{array}{ccc}X \\ Y \\ 1 \end{array}\right)  
+$$
+于是M[r1,r2,t]对应于单应性矩阵H = [h1,h2,h3]
+$$
+r1 = \lambda M^{-1} h1\\
+r2 = \lambda M^{-1} h2\\
+t = \lambda M^{-1} h3\\
+$$
+R为正交矩阵,因此
+$$
+r1r2^T = 0 \rightarrow h2^TM^{-T}M^{-1}h1 = 0 \\
+|r1|= |r2| \rightarrow h2^TM^{-T}M^{-1}h2 = h1^TM^{-T}M^{-1}h1 
+$$
+令B = M^{-T}M^{-1},可得到B解析解的形式.将前述二次型方程展开
+$$
+\left(\begin{array}{ccc} h_{i1}h{j1} & h_{i1}h{j2}+h_{i2}h{j1} &  h_{i1}h_{j3}+h_{i3}h_{j1} &  h_{i2}h_{j2} &  h_{i2}h_{j3}+h_{i3}h_{j2} &  h_{i3}h_{j4}  \end{array} \right) \left(\begin{array}{ccc} B_{11} &  B_{12} &  B_{13} &  B_{22} & B_{32} & B_{33}  \end{array} \right) ^T  \\
+\rightarrow \left(\begin{array}{ccc} V_{12}^T \\ V_{11}^T-V_{22}^T\end{array} \right) b = 0
+$$
+这是一个视图方程,有k个视图可得k个这样的方程.从而得到B,进而根据B与M之间的解析关系得到内参矩阵.
+\lambda由|r1| = 1得到
+$$
+\lambda = 1/|M^{-1}h1| \\ r3 = r1\times r2
+$$
+此时还忽略了畸变,但求了估计的内参和外参,在外餐转到相机坐标后为无畸变坐标,再联立畸变方程估计畸变参数.固有参数、外参和畸变参数采用反复迭代的方式求解.
+- opencv api
+  - 标定
+  `double cv::calibrateCamera(InputArrayOfArrays objectPoints,InputArrayOfArrays imagePoints,Size imageSize,InputOutputArraycameraMatrix, InputOutputArray distCoeffs,OutputArrayOfArrays rvecs,OutputArrayOfArrays tvecs, int flags = 0,TermCriteria criteria = TermCriteria(TermCriteria::COUNT+TermCriteria::EPS, 30, DBL_EPSILON))`
+  - 计算世界坐标系坐标的旋转和平移矩阵[标定的子过程]
+  `int cv::solveP3P(InputArray objectPoints,InputArray imagePoints,InputArray cameraMatrix,InputArray distCoeffs,OutputArrayOfArrays rvecs,OutputArrayOfArrays tvecs,int flags)`
+  - 稠密去畸变重映射
+  `void cv::initUndistortRectifyMap(InputArray cameraMatrix,InputArray distCoeffs,InputArray R,InputArray newCameraMatrix,Size size,int m1type,OutputArray map1,OutputArray map2)`+`void cv::remap(InputArray src,OutputArray dst,InputArray map1,InputArray map2,int interpolation,int borderMode = BORDER_CONSTANT,const Scalar& borderValue=Scalar())`  R是相机坐标的全局补偿,newCameraMatrix是相机坐标至像素坐标,可来自stereoRectify P1/P2
+  `void cv::undistort(InputArray src,OutputArray dst,InputArray cameraMatrix,InputArray distCoeffs,InputArray newCameraMatrix =noArray())` 
+  - 稀疏去畸变重映射
+  `void cv::undistortPoints(InputArray src,OutputArray dst,InputArray cameraMatrix,InputArray distCoeffs,InputArray R = noArray(),InputArray P=noArray())` R是相机坐标的全局补偿,P是相机坐标至像素坐标,可来自stereoRectify
+  - 世界坐标系坐标投影至像素坐标
+  `void cv::projectPoints(InputArray objectPoints,InputArray rvec,InputArray tvec,InputArray cameraMatrix,InputArray distCoeffs,OutputArray imagePoints,OutputArray jacobian=noArray(),double aspectRatio=0)` 
 
-### 深度图
+### 双目相机立体视觉
+- 双目相机深度测量的步骤
+(1)使用数学方法消去畸变 
+(2)调整相机之间的角度和距离,使两图像平面共面.这一过程称为Rectification
+(3)左右相机中找到相同的特征,输出视差图,即相同特征在左右相机中的坐标差,这一过程称为匹配.
+(4)将视差转化为深度图,称为重投影. Z = fT/d
+- 对极几何
+ - 本征矩阵(essential matrix),描述两坐标中同一物理坐标之间关系.左(右)相机物理坐标点为p_l(p_r),左右坐标系之间的变换为R,T.则
+$$
+T\times p_l = S \cdot p_l \\  S = \left(\begin{array}{ccc} 0 &-T_z & T_y \\ T_z & 0 & -T_x \\ -T_y & T_x & 0 \end{array} \right),rank(S) = 2 \\
+(p_l-T)^T(T\times p_l) = 0 ,p_r = R(p_l-T) 
+\rightarrow (R^{-1}p_r)^TSp_l = 0 \rightarrow p_r^{T}RSp_l = 0 \rightarrow p_r^{T}Ep_l = 0  (E\equiv RS)
+$$
+  - 基本矩阵(fundamental matrix),描述左右相机像素坐标之间的关系.有本征矩阵出发,投影到像素坐标,则
+$$
+  (M^{-1}q_r)^TEM^{-1}q_l = 0 \rightarrow q_r^TM^{-T}EM^{-1}p_l = 0 \rightarrow q_r^TFp_l = 0 (F\equiv M^{-T}EM^{-1})
+$$
+  - 本征矩阵和基本矩阵的直观理解:E,F的秩均为2,因此给定E,F和其中一个相机中坐标,其二次型展开后解空间为一条直线,表示单目相机某一成像点在另一台相机中的可能位置是一条直线.即真实相点和投影中心在另一项相机中投影的连线——级线(epiline) 
+  `void cv::computeCorrespondEpilines(InputArray 	points,int whichImage,InputArray F,OutputArray lines)`
+- 计算基本矩阵
+  - 根据图像匹配直接计算
+  F为3x3矩阵,但因其秩为2,因此自由度只有8.本征矩阵和基本矩阵关于两相机的坐标约束均为二次型,其中坐标已知时可转换为线性方程,因此至少需要8个匹配像素坐标. `Mat cv::findEssentialMat(InputArray points1,InputArray points2,InputArray cameraMatrix,int method = RANSAC,double prob=0.999,double threshold = 1.0,OutputArray mask = noArray())`
+`Mat cv::findFundamentalMat(InputArray points1,InputArray points2,OutputArray mask,int method = FM_RANSAC,double ransacReprojThreshold = 3.,double confidence=0.99)`
+  - 根据标定信息计算 
+  根据世界坐标系中坐标分别投影至像素坐标后表示同一物体的约束:
+$$
+q_r = R_rq+T_r  , q_l = R_lq+T_l  , q_l = R(q_r-T)\\
+\rightarrow R = R_r^TR_l , T =T_r-R^TT_l 
+$$
+- 双目矫正Rectification
+在计算得到两相机坐标系变换的R,T后,需要利用其将两个成像平面变换至共面.首先将R平分一半,此时两相机平行.再次构造R_rect,沿着两投影中心连线方向旋转,使得两成像平面共面 
+$$
+R_l = R_r^T = R^{1/2} \\
+e_1 = T/|T|, e_2 = (-e_{1y},e_{1x},0), e_3 = e1 \times e2  R_rect = \left(\begin{array}{ccc}e_1 & e_2 & e_3 \end{array} \right) 
+$$
+将图片根据所得旋转矩阵(R1 = R_lR_rect, R2 = R_rR_rect)矫正后,得到对齐的图像,通过匹配得到视差图,然后重投影(X,Y,Z = X,Y,ft/d,写成矩阵乘法形式W=Q[4x4]P)得到深度图,[stereoRectify中P1,P2是3D坐标转到像素坐标投影矩阵,但我不知道跟相机内参除了平移外有何差异,应该是转动后改了]
+- opencv中api
+  - 双目标定[单目标定+两相机之间的关系]
+  `double cv::stereoCalibrate(InputArrayOfArrays objectPoints,InputArrayOfArrays imagePoints1,InputArrayOfArrays imagePoints2,InputOutputArray 	cameraMatrix1,InputOutputArray distCoeffs1,InputOutputArray cameraMatrix2,InputOutputArray 	distCoeffs2,Size 	imageSize,InputOutputArray 	R,InputOutputArray T,OutputArray E,OutputArray F,int flags = CALIB_FIX_INTRINSIC,TermCriteria criteria=TermCriteria(TermCriteria::COUNT+TermCriteria::EPS, 30, 1e-6))`
+  - 双目矫正
+  `void cv::stereoRectify(InputArray cameraMatrix1,InputArray distCoeffs1,InputArray cameraMatrix2,InputArray distCoeffs2,Size imageSize,InputArray R,InputArray T,OutputArray R1,OutputArray R2,OutputArray P1,OutputArray P2,OutputArray Q,int flags =CALIB_ZERO_DISPARITY,double alpha=-1,Size newImageSize=Size(),Rect* validPixROI1=0,Rect* validPixROI2=0)`
+  - 视差图转成深度图
+  `void cv::reprojectImageTo3D(InputArray disparity,OutputArray 3dImage,InputArray Q,bool handleMissingValues=false,int ddepth = -1)`
 
 
-
-参考资料:
-[1]学习OpenCV3
-[2]数字图像处理(第三版)
-[3]https://docs.opencv.org/master/
-[4]http://effbot.org/imagingbook/pil-index.htm
+参考资料:  
+  [1]Adrian Kaehler,Gary Bradski."学习OpenCV3". 2018  
+  [2]RafaelC.Gonzalez,Richard E.Woods."数字图像处理(第三版)",2011  
+  [3]https://docs.opencv.org/master/  
+  [4]http://effbot.org/imagingbook/pil-index.htm  
 
 
 
