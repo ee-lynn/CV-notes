@@ -20,17 +20,17 @@
 
 ### RGB
 
-[Red/Green/Blue]人眼感受光主要由锥状细胞,分别对红绿蓝光做出感受，波长吸收峰值分比为575nm,535nm,445nm.在硬件中也容易对此颜色空间做出控制.
+[Red/Green/Blue]人眼主要由锥状细胞感受光,分别对红绿蓝光做出感受，波长吸收峰值分比为575nm,535nm,445nm.在硬件中也容易对此颜色空间做出控制.
 RGB构成笛卡尔坐标系,立方体斜对角线是灰度级. 具体表示时,一般每个像素采用3个字节表示,但也有采用2个字节表示,用5,6,5位(RGB565)和5,5,5位(RGB555)表示各个分量
 
 ### CMYK
 
-是RGB的补色，也是颜料的三原色(对应颜色原料吸收RGB).为克服将CMY混合产生黑色不纯，单独设置黑色通道K,常用语打印机设备.
+是RGB的补色，也是颜料的三原色(对应颜色原料吸收RGB).为克服将CMY混合产生黑色不纯，单独设置黑色通道K,常用于打印机设备.
 
 ### HSV/HSI
 
-[Hue/Saturation/Value]符合人对颜色的解释.亮度表达了无色的强度概念,色调是光波混合中与主波长有关的属性,与表示观察者感知的主要颜色(赤橙黄绿蓝靛紫),饱和度指的是相对纯净度,或一种颜色混合白光的数量.色调和饱和度一起称为色度
-将RGB的笛卡尔坐标系以其斜对角线为轴垂直放置,与颜色的平面与红色的夹角为色度,轴与颜色的距离为饱和度.颜色位于轴的高度为I,RGB的最大值为V
+[Hue/Saturation/Value]符合人对颜色的解释.亮度[Value]表达了无色的强度概念,色调[Hue]是光波混合中与主波长有关的属性,表示观察者感知的主要颜色(赤橙黄绿蓝靛紫),饱和度[Saturation]指的是相对纯净度,或一种颜色混合白光的数量.色调和饱和度一起称为色度
+将RGB的笛卡尔坐标系以其斜对角线为轴垂直放置,颜色的平面与红色的夹角为色度,轴与颜色的距离为饱和度.颜色位于轴的高度为I,RGB的最大值为V
 
 ### YUV/YCbCr/YUV420/NV12/NV21/I420/YV12
 
@@ -39,7 +39,7 @@ Y = 0.299R+0.587G+0.114B
 Cb = 0.564(B-Y)  里面含0.5B,范围在-127~127
 Cr = 0.713(R-Y)  里面含0.5R,范围在-127~127
 UV分别是Cb+128与Cr+128
-- 视觉系统对亮度更敏感而对色度不敏感，因此可以压缩色度通道起到压缩的作用.
+- 视觉系统对亮度更敏感而对色度不敏感，因此可以压缩色度通道起到节约带宽和内存的作用.
   - 4:4:4表示完全取样
   - 4:2:2表示2:1的水平取样，垂直完全采样
   - 4:2:0表示2:1的水平取样，垂直2:1采样
@@ -50,11 +50,11 @@ UV分别是Cb+128与Cr+128
   - NV12(YUV420sp):420,Y plane,先U后V的pack(Semi-Planar)形式
   - NV21:420,Y plane,先V后U的pack形式
   - YUYV(V422,YUNV,YUY2): 422, 按照YUYV的pack形式
-  - UYVY(Y422,UYNV): 422, 按照UYNV的pack形式
+  - UYVY(Y422,UYNV): 422, 按照UYVY的pack形式
 
 ### 其他彩色空间及相互转换
 
-除上述以外还有XYZ,Lab等颜色空间.不再详述.均可由```cv::cvtColor(InputArray src, OutputArray dst, int code, int dstCn=0)[or dst=cv.cvtColor(src, code[, dst[, dstCn]]) or PIL.Image.Image.convert(mode=None)，"L"(gray)/"RGB"/"CMYK/YCbCr"```转换，其中code标记转换的两个表示空间，可以在RGB/GRAY/XYZ/YCrCb/HSV/Lab/Luv/HLS(HSI)/YUV family(上面列出的420和422格式)
+除上述以外还有XYZ,Lab等颜色空间.不再详述.均可由`cv::cvtColor(InputArray src, OutputArray dst, int code, int dstCn=0) or PIL.Image.Image.convert(mode=None)，"L"(gray)/"RGB"/"CMYK/YCbCr"`转换，其中code标记转换的两个表示空间，可以在RGB/GRAY/XYZ/YCrCb/HSV/Lab/Luv/HLS(HSI)/YUV family(上面列出的420和422格式)
 
 ## 图像变换与操作
 
@@ -65,7 +65,7 @@ UV分别是Cb+128与Cr+128
 为了达到特定的效果，达到指定的直方图,可对像素进行变换.根据概率的观点,就是寻找一个变换函数r->s[记为H]，使概率密度函数从原来的f_r(r)变换成f_s(s)
 根据 
 $$
-\int^{r_0}f_r(r)dr=\int^{H(r_0)}f_s(s)ds -> F_r(r_0)=F_s(H(r_0)) 可得H(r)= F_s^{-1}(F_r)
+\int^{r_0}f_r(r)dr=\int^{H(r_0)}f_s(s)ds \rightarrow F_r(r_0)=F_s(H(r_0)) 可得H(r)= F_s^{-1}(F_r)
 $$
 特别地当想要直方图均衡化时(指定的直方图是均匀分布),变换函数为F_r,即按照概率分布函数进行变换.
 - 计算直方图和直方图均衡的方式
@@ -78,7 +78,7 @@ $$
 ### 空间滤波与卷积
 卷积作为一种线性操作,是图像空间滤波的概括表述:
 $$ f \star b(x,y) = \Sigma_{s=-a}^{a}\Sigma_{t=-b}^{b}{w(s,t)f(x+s,y+t)} $$
-其中卷积核关于原点的反转已经省略(实际上上实定义了相关操作,但反转操作只是卷积核表示的问题,可以等价起来.这种定义方式也convolution neural neworks中定义方式) 卷积核都是单通道的,处理多通道图片仅在C维上做广播.
+其中卷积核关于原点的反转已经省略(实际上是定义了相关操作,但反转操作只是卷积核表示的问题,可以等价起来.这种定义方式在CNN中也这样定义) 卷积核都是单通道的,处理多通道图片仅在C维上做广播.
 `void cv::filter2D(InputArray src,OutputArray dst,int ddepth,InputArray kernel,Point anchor=Point(-1,-1),double delta=0, int borderType=BORDER_DEFAULT)`
 opencv中还有大量专用的空间滤波函数,如blur,GaussioanBlur,bilateralFilter,Sobel,Laplacian等等.
 `PIL.Image.filter(PIL.ImageFilter.Kernel(size, kernel, scale=None, offset=0))`
@@ -98,7 +98,8 @@ opencv中还有大量专用的空间滤波函数,如blur,GaussioanBlur,bilateral
     - 闭操作: 先膨胀在腐蚀,消除向内凹的小尖角(空间尺寸上和灰度高度上),可以看成闭操作的互补
     - 击中击不中变换: 用两个结构元,一个对图形腐蚀,一个对图形补集膨胀,交集部分.
     - 帽顶帽底变换: 冒顶变换就是图形减去开操作，剩下向外凸的小尖角，帽底就是闭操作减去图形，剩下向内凹的小尖角.
-统一接口`void cv::morphologyEx(InputArray src,OutputArray dst,int op,InputArray kernel,Point anchor=Point(-1,-1),int iterations=1,int borderType=BORDER_CONSTANT,const Scalar& borderValue=morphologyDefaultBorderValue())`		
+统一接口`void cv::morphologyEx(InputArray src,OutputArray dst,int op,InputArray kernel,Point anchor=Point(-1,-1),int iterations=1,int borderType=BORDER_CONSTANT,const Scalar& borderValue=morphologyDefaultBorderValue())`
+
 `op = MORPH_ERODE/MORPH_DILATE/MORPH_OPEN/MORPH_CLOSEMORPH_GRADIENT/MORPH_TOPHAT/MORPH_BLACKHAT/MORPH_HITMISS`其中`iterations`指复合操作中基本操作的次数，而不是复合操作的次数,因为根据定义性质，复合操作重复多次并没有用.
 PIL中只能复合基本操作来实现
 ### 几何变换
@@ -109,15 +110,14 @@ PIL中只能复合基本操作来实现
 #### 齐次坐标
 将一个原本是n维的向量用一个n+1维向量来表示,二维点(x,y)的齐次坐标表示为(hx,hy,h),计算得到的齐次坐标点(x,y,z)与(x/z,y/z,1)是同一个点.投影时,在一个投影平面上z都取1.因此透视变换其实只有8个自由变量. (x,y,1) -> (x',y',z') <-> (x'/z',y'/z',1). 而仿射变换因要求保持变换前后平行的关系,确定变换前后3个点后,第4个点便确定了,因此只有6个自由变量.
 #### opencv中api
-`void cv::resize(InputArray	src,OutputArray	dst,Size dsize,double fx = 0,double	fy = 0,int interpolation = INTER_LINEAR)`,其中dsize/fx,fy需要指定其中一套即可.	
-稠密仿射变换:`void cv::warpAffine(InputArray src,OutputArray dst,InputArray M,Size dsize,int flags = INTER_LINEAR,int borderMode=BORDER_CONSTANT,const Scalar&	borderValue=Scalar())`		 flags除了设置插值方式外,还可以组合`WARP_INVERSE_MAP`表示M(2x3)矩阵是dst至src的仿射变换矩阵
-稀疏仿射变换:`void cv::transform(InputArray src,OutputArray dst,InputArray m)` *note* m作用在输入的channel维度,当维度相同时,不补1,否则用齐次坐标. m可以是2x2或3x3. src 可以1-4通道.	
-获得仿射变换矩阵:`Mat cv::getAffineTransform(InputArray src,InputArray dst)` src和dst提供三个2维点
-特别地旋转作为一种特殊的仿射变换:`Mat cv::getRotationMatrix2D(Point2f center,double angle,double scale)`
-稠密透视变换`void cv::warpPerspective(InputArray src,OutputArray dst,InputArray M,Size dsize,int flags = INTER_LINEAR,int borderMode=BORDER_CONSTANT,const Scalar& borderValue = Scalar())`		M为3x3单应性矩阵,最后的结果将重新化为齐次坐标Z=1的平面.
-稀疏透视变换`void cv::perspectiveTransform(InputArray src,OutputArray dst,InputArray m)` m可以是3x3(2D点)/4x4(3D点)
-获得透视变换矩阵:`Mat cv::getPerspectiveTransform(InputArray src,InputArray dst,int solveMethod=DECOMP_LU)`	src,dst提供四个2维点
-`findHomography`是一种优化版本,即提供大于四个点，解超定方程.
+`void cv::resize(InputArray	src,OutputArray	dst,Size dsize,double fx = 0,double	fy = 0,int interpolation = INTER_LINEAR)`,其中dsize/fx,fy需要指定其中一套即可.  
+稠密仿射变换:`void cv::warpAffine(InputArray src,OutputArray dst,InputArray M,Size dsize,int flags = INTER_LINEAR,int borderMode=BORDER_CONSTANT,const Scalar&	borderValue=Scalar())`		 flags除了设置插值方式外,还可以组合`WARP_INVERSE_MAP`表示M(2x3)矩阵是dst至src的仿射变换矩阵  
+稀疏仿射变换:`void cv::transform(InputArray src,OutputArray dst,InputArray m)` *note* m作用在输入的channel维度,当维度相同时,不补1,否则用齐次坐标. m可以是2x2或3x3. src 可以1-4通道.   
+获得仿射变换矩阵:`Mat cv::getAffineTransform(InputArray src,InputArray dst)` src和dst提供三个2维点  
+特别地旋转作为一种特殊的仿射变换:`Mat cv::getRotationMatrix2D(Point2f center,double angle,double scale)`  
+稠密透视变换`void cv::warpPerspective(InputArray src,OutputArray dst,InputArray M,Size dsize,int flags = INTER_LINEAR,int borderMode=BORDER_CONSTANT,const Scalar& borderValue = Scalar())`	M为3x3单应性矩阵,最后的结果将重新化为齐次坐标Z=1的平面.  
+稀疏透视变换`void cv::perspectiveTransform(InputArray src,OutputArray dst,InputArray m)` m可以是3x3(2D点)/4x4(3D点)  
+获得透视变换矩阵:`Mat cv::getPerspectiveTransform(InputArray src,InputArray dst,int solveMethod=DECOMP_LU)`	src,dst提供四个2维点,`findHomography`是一种优化版本,即提供大于四个点，解超定方程.  
 #### PIL中api
 `PIL.Image.resize(size,filter)` filter可取`Image.NEAREST(default)/Image.BILINEAR/Image.BICUBIC/Image.ANTIALIAS`
 `PIL.Image.transfrom(size, method, data, filter)` 
@@ -130,14 +130,14 @@ Image.PERSPECTIVE:此时data包含8个元素的从输出到输入的透视变换
 #### Opencv 核心数据结构
 Mat封装了稠密张量数据结构,采用引用计数进行内存管理,当内存引用次数归零后内存自动释放.
 几种数据结构的继承关系:
-Mat <- Mat_<_Tp> 增加了圆括号索引,对于常用的形状和数据类型有很多别名: 类型有unchar(b),double(b),int(i),short(s),float(f),元素类别是数字时为1,Vec时数字为Vec元素个数,例如 Mat_<float> 即 Mat1f，Mat_<Vec3b>即 Mat3b. 作为特化的Mat，它的一些函数不需要再加类名.例如 Mat::at<_Tp>(row,col) 可以直接写成 Mat::at(row,col).
-Matx<_Tp,m,n> 小矩阵模板,能初始化1,2,3,4,5,6,7,8,9,10,12,14,16个元素，别名为Matx{Tp}{m}{n} <- Vec<_Tp,cn> (即令基类n=1) 增加了方括号索引,也具有别名VecTpcn <- Scalar_<_Tp> (即令基类cn=4)
-除此以外还有Rect_<_Tp>,Size_<_Tp>,Point_<_Tp>,不加模板时均是_Tp为int时的别名.
+`Mat <- Mat_<_Tp>`增加了圆括号索引,对于常用的形状和数据类型有很多别名: 类型有unchar(b),double(d),int(i),short(s),float(f),元素类别是数字时为1,Vec时数字为Vec元素个数,例如 Mat_<float> 即 Mat1f，Mat_<Vec3b>即 Mat3b. 作为特化的Mat，它的一些函数不需要再加类名.例如 Mat::at<_Tp>(row,col) 可以直接写成 Mat::at(row,col).
+Matx<_Tp,m,n> 小矩阵模板,能初始化1,2,3,4,5,6,7,8,9,10,12,14,16个元素，别名为`Matx{Tp}{m}{n} <- Vec<_Tp,cn> `(即令基类n=1) 增加了方括号索引,也具有别名VecTpcn <- Scalar_<_Tp> (即令基类cn=4)
+除此以外还有`Rect_<_Tp>,Size_<_Tp>,Point_<_Tp>`,不加模板时均是_Tp为int时的别名.
 Ptr<_Tp>提供了类似shared_ptr<_Tp>的智能指针,将自我进行内存管理. Mat::ptr<_Tp>(row)将返回指向row单个元素的指针.MatConstIterator,MatIterator作为迭代器,会自动跳过图片存储中pitch和width之间的gap.
 #### PIL 数据结构
 `Image.fromarray(numpy.ndarray)  <->  numpy.asarray(PIL.Image)`可使图片与numpy互相转换.
 ## 图像压缩与输入输出
-若将图片在某个颜色空间的数组全部存储将消耗太多存储资源,考虑到编码(不需要都采用a完整字节表示),时间空间(时空上具有一定可预测性),不相关信息(可以取消对视觉效果影响不大的存储)的冗余，有很多压缩方法。图片类型的不同，采取的压缩方式也不同。
+若将图片在某个颜色空间的数组全部存储将消耗太多存储资源,考虑到编码(不需要都采用完整字节表示),时间空间(时空上具有一定可预测性),不相关信息(可以取消对视觉效果影响不大的存储)的冗余，有很多压缩方法。图片类型的不同，采取的压缩方式也不同。
 ### 一些主要的压缩方法：
 - 霍夫曼编码：霍夫曼编码采用变长编码,图片中出现概率高的像素值采用短的编码,概率小的采用长编码,使得总体上编码长度缩短，平均像素编码长度接近于图片的信息熵(香农第一定理).采用霍夫曼树的构建方式即可.
 - 行程编码:基本思想是存储像素值和连续像素数量,在存储二值图像比较有用.
@@ -171,31 +171,31 @@ Ptr<_Tp>提供了类似shared_ptr<_Tp>的智能指针,将自我进行内存管�
 
 ### 混合高斯模型背景建模(参数化模型)
 
-   Zoran Zivkovic, Ferdinand van Heijden. Efficient adaptive density estimation per pixel for the atsk of background subtraction. 2006
+    Zoran Zivkovic, Ferdinand van Heijden. Efficient adaptive density estimation per pixel for the atsk of background subtraction. 2006
 
-每个像素以混合高斯分布建模.
-1.初始化:对第一帧，以随机像素值为均值,给定方差,建立K个高斯模型，权重w均为1/K,K一般取3~5
-2.更新:匹配高斯分布(以小于D个标准差为判据,D一般取2.50-3.5)，
-若匹配，则 [a为学习率 p = a*gaussian(X)]
-  更新权重:w = (1-a)*w+a
-  更新均值方差:mean = (1-p)*mean+p*X; std2 = (1-p)*std2+p*(X-mean)**2
-若不匹配，则
-  更新权重:w = (1-a)*w
-若所有模式都不匹配，则
-  创建新的高斯分布替换掉权重最小的高斯分布,以该像素值为均值,给定一个方差.
-最后对所有权重进行归一化
+每个像素以混合高斯分布建模.  
+1.初始化:对第一帧，以随机像素值为均值,给定方差,建立K个高斯模型，权重w均为1/K,K一般取3~5.  
+2.更新:匹配高斯分布(以小于D个标准差为判据,D一般取2.50-3.5),  
+若匹配，则 [a为学习率 p = a*gaussian(X)]  
+  更新权重:w = (1-a)*w+a  
+  更新均值方差:mean = (1-p)*mean+p*X; std2 = (1-p)*std2+p*(X-mean)^2  
+若不匹配，则  
+  更新权重:w = (1-a)*w  
+若所有模式都不匹配，则  
+  创建新的高斯分布替换掉权重最小的高斯分布,以该像素值为均值,给定一个方差.  
+最后对所有权重进行归一化  
 3.预测:按照w/std从**大**到**小**排序,对其求cumsum,达到给定背景所占比例T(T>0.7)时,匹配分布在T以内高斯的像素为背景，否则为前景.
 
 ### ViBe(Visual Background Extractor,非参数化模型)
 
     O. Barnich and M. Van Droogenbroeck. ViBe: A universal background subtraction algorithm for video sequences. In IEEE Trans. Image Processing, 2011.
-认为每个背景像素以邻域像素组成的样本集表示,通过概率更新样本集和距离阈值来判断.
-1.初始化:对于一个像素点，随机地选择它的邻域像素值作为它的模型样本值
-2.更新:保守的更新策略或前景点计数方法。每一个背景点有φ的概率去更新自己的模型样本值，同时也有φ的概率去更新它的邻居点的模型样本值。在选择要替换的样本集中的样本值时随机选取一个样本值进行更新
-保守的更新策略：前景点永远不会被用来填充背景模型。
-前景点计数：对像素点进行统计，如果某个像素点连续N次被检测为前景，则将其更新为背景点。
-3.预测。
-比较像素点与其样本集合中各点的L2距离,统计符合条件的点数,小于阈值时为前景,否则为背景.
+
+认为每个背景像素以邻域像素组成的样本集表示,通过概率更新样本集和距离阈值来判断.  
+1.初始化:对于一个像素点，随机地选择它的邻域像素值作为它的模型样本值  
+2.更新:保守的更新策略或前景点计数方法。每一个背景点有φ的概率去更新自己的模型样本值，同时也有φ的概率去更新它的邻居点的模型样本值。在选择要替换的样本集中的样本值时随机选取一个样本值进行更新  
+保守的更新策略：前景点永远不会被用来填充背景模型。  
+前景点计数：对像素点进行统计，如果某个像素点连续N次被检测为前景，则将其更新为背景点。  
+3.预测:比较像素点与其样本集合中各点的L2距离,统计符合条件的点数,小于阈值时为前景,否则为背景.  
 
 ### opencv中提供的接口
 opencv中的背景建模在`<opencv2/video/background_segm.hpp>`共同的基类为`cv::BackgroundSubtractor`提供了`virtual void cv::apply((InputArray image,OutputArray fgmask,double learningRate=-1)`，其子类有:
@@ -209,7 +209,7 @@ cv::BackgroundSubtractorKNN(非参数模型),cv::BackgroundSubtractorMOG2(参数
 - 一些具有辨识能力的点,特别地可应用到多视角图片的匹配等；
 harris测度:一个点作为关键点,位置移动一下像素会变化很多.基于这个思想构造
 $$
-\Sigma x,y \in (w,h) w_xy[I(x+\delta x,y+\delta y)-I(x,y)]^2
+\Sigma_{x,y \in (w,h)} w_{xy}[I(x+\delta x,y+\delta y)-I(x,y)]^2
 $$
 在一个小窗口(w,h)内，在w_xy系数加权下L2距离. 线性化后展开后可以表示为\delta x,\delta y的二次型，其hessian阵H的特征值表征了角点好坏. harris测度定义为
 $$
@@ -264,7 +264,7 @@ SIFT描述符具有平移、缩放、旋转不变性，同时对光照变化、�
 光流算法的理想输出是两针图像中每个像素的位移矢量。图像中每个像素都是用这种方法,则通常称其为"稠密光流",仅仅对图像中某些点的子集计算则被称为"稀疏光流".
 opencv中光流计算均在`<opencv2/video/tracking.hpp>`中
 ### 稀疏光流
-- Lucas-Kanade算法的三个假设:(1)亮度恒定:像素值加上速度后值恒定;(2)时间较快,运动微小:所求位移矢量就是速度矢量;(3)空间一致性:空间小窗口内位移矢量相同,用于正则化，环节孔径效应(透过一个小孔观察更大无图的运动,无法得知真实运动信息,只知道垂直边缘的运动速度).
+- Lucas-Kanade算法的三个假设:(1)亮度恒定:像素值加上速度后值恒定;(2)时间较快,运动微小:所求位移矢量就是速度矢量;(3)空间一致性:空间小窗口内位移矢量相同,用于正则化，缓解孔径效应(透过一个小孔观察更大物体的运动,无法得知真实运动信息,只知道垂直边缘的运动速度).
 $$
 \nabla I \cdot u=-dI/dt  (由假设1,2导出)
 $$
@@ -286,7 +286,7 @@ $$
 $$
 \min_{u(x,y),v(x,y)} \int \psi(I(x,y)-I(x+u,y+v))dxdy
 $$
-其中$$\psi$$是误差函数,根据不同需求可取L1,L2函数.
+其中\psi是误差函数,根据不同需求可取L1,L2函数.
   - 对纯色区域只要求尽可能匹配是不够的,还需要加入正则项
 $$
 \min_{u(x,y),v(x,y)} \int \phi(\nabla u, \nabla v)dxdy
@@ -297,14 +297,14 @@ $$
 $$
   - dual TV-L1
 
-        Zach C , Pock T , Bischof H . A Duality Based Approach for Realtime TV-L1 Optical Flow, 2007.
+    Zach C , Pock T , Bischof H . A Duality Based Approach for Realtime TV-L1 Optical Flow, 2007.
 
 早期的H-S算法是上述优化问题中误差函数都定义为L2,再使用变分法得到欧拉方程经过数值解法解,效果不是很好.TV-L1将误差函数都设为L1，且将上述问题拆成两个问题.
 引入新优化变量v，优化问题变成
 $$
 \min_{u,v} \int [|I(x+u)-I(x)|+\lambda |\nabla u|+(u-v)^2/\theta]dxdy
 $$
-再次将I(x+u)-I(x)在x+v附近用一阶tailor展开成线性 \rho =I(x+v)+dI(x+v)/dx(u-v)-I(x),代入优化目标.因为u与v很接近,采用交替求解的方式:
+再次将I(x+u)在x+v附近用一阶tailor展开成线性 \rho =I(x+v)+dI(x+v)/dx(u-v),代入优化目标.因为u与v很接近,采用交替求解的方式:
 
   - step1:固定v，求u
 $$
@@ -325,6 +325,7 @@ $$
 - opencv api
 稠密光流共同基类为`cv::DenseOpticalFlow`,统一接口为`virtual void cv::DenseOpticalFlow::calc(InputArray I0,InputArray I1,InputOutputArray flow)`
 可以使用的方法有`cv::DISOpticalFlow; cv::FarnebackOpticalFlow;  cv::optflow::DualTVL1OpticalFlow; cv::VariationalRefinedment`
+
 - 采用深度学习计算光流
 
       Fischer P., Dosovitskiyz A. , Ilgz E., et al, FlowNet: Learning Optical Flow with Convolutional Networks. ICCV 2015
@@ -402,6 +403,9 @@ $$
     1-\Sigma \mu_1\mu_2\sigma_1\sigma_2/[(\mu_1^2+\mu_2^2)(\sigma_1^2+\sigma_2^2)]
     $$
     其中\mu \sigma 均是8x8像素块内的均值方差,下标1,2分别是前帧和后帧与光流重建的图像中按照stride=8切割的图像块.MotionNet整个网络结构与FlowNetSD相同,在升采样中每个尺度上产生的光流均计算损失.
+
+
+
 
 ## 相机模型与立体视觉
 
@@ -526,7 +530,7 @@ $$
 在计算得到两相机坐标系变换的R,T后,需要利用其将两个成像平面变换至共面.首先将R平分一半,此时两相机平行.再次构造R_rect,沿着两投影中心连线方向旋转,使得两成像平面共面 
 $$
 R_l = R_r^T = R^{1/2} \\
-e_1 = T/|T|, e_2 = (-e_{1y},e_{1x},0), e_3 = e1 \times e2  R_rect = \left(\begin{array}{ccc}e_1 & e_2 & e_3 \end{array} \right) 
+e_1 = T/|T|, e_2 = (-e_{1y},e_{1x},0), e_3 = e1 \times e2 , R_{rect} = \left(\begin{array}{ccc}e_1 & e_2 & e_3 \end{array} \right) 
 $$
 将图片根据所得旋转矩阵(R1 = R_lR_rect, R2 = R_rR_rect)矫正后,得到对齐的图像,通过匹配得到视差图,然后重投影(X,Y,Z = X,Y,ft/d,写成矩阵乘法形式W=Q[4x4]P)得到深度图,[stereoRectify中P1,P2是3D坐标转到像素坐标投影矩阵,但我不知道跟相机内参除了平移外有何差异,应该是转动后改了]
 - opencv中api
