@@ -19,6 +19,10 @@ CNN在计算机视觉任务中具有越来越举足轻重的作用，不光光�
     - channel attention:SE
     - serial decoupled spatial-channel attention:CBAM
     - coupled spatial-channel attention:Residual attention.
+    - deformable convolution
+    - selective kernal
+    - global context block
+    - spatial group-wise enhance
 
 ## powerful models
 
@@ -728,7 +732,7 @@ intuition:　既然前期研究结果显示神经网络深度很重要，那么�
     
 ### boost block in CNN: attention
 
-作为CNN中作为轻量级组件，self-attention机制的引入将进一步提升CNN的表达能力,且可以嵌入到之前所述任何一种CNN中.根据空间和通道两个维度,本文总结了四种attention机制，分别为spatial transformer, squeenze and excitation, residual attention和 convolution block attention module. 
+作为CNN中作为轻量级组件，self-attention机制的引入将进一步提升CNN的表达能力,且可以嵌入到之前所述任何一种CNN中.根据空间和通道两个维度,本文总结了多种attention机制，分别为spatial transformer, squeenze and excitation, residual attention和 convolution block attention module,. 
 
 #### spatial transformer
 
@@ -788,3 +792,57 @@ intuition:　既然前期研究结果显示神经网络深度很重要，那么�
 - channel attention与SE相同,但同时考虑了global max pooling和global Ave pooling,它们共享一个含一层隐层的FC后相加作sigmoid
 - spatial attention:沿channel维度分别作Ave pooling和max pooling 后concat,再接convolution(感受野大一些为佳,采用7X7),最后sigmoid
 - 结合:两个attention module串联,且先channel后spatial效果最好
+
+#### deformable convolution/pooling
+
+    Dai, J. , Qi, H. , Xiong, Y. , Li, Y. , Zhang, G. , & Hu, H. , et al. Deformable convolutional networks. ICCV 2017
+
+- 传统的卷积是固定的网格采样方式,例如3x3卷积核计算当前位置及其8邻域.deformable convolution在其采样网格上加上偏移,使采样点增加一个偏移量，且在卷积核的各通道上共享,即卷积计算方式改为
+$$
+y(h,w) = \Sigma_{-(1+k)/2<i,j<=(k+1)/2,c} x(c,h+i+\delta i,w+j+\delta j) w(c,i,j)
+$$
+其中偏移量由前面feature map加上卷积层输出2N通道,N为卷积核大小,2对应于\delta i和\delta j
+
+- ROI Pooling相似，也是将pooling的各bin都增加偏移量:
+$$
+y(h,w) = 1/n_in_j \Sigma_{x,y} x(p_x+\delta p_x,p_y+\sigma p_y), iw/n_i<=p_x<(i+1)w/n_i,ih/n_j<=p_y<(j+1)w/n_j
+$$
+偏移生成方式是在前面feature map上采用常规的ROI Poolig后得到固定尺寸的feature后接FC再得到2N个归一化移,输出前还需要点乘ROI的(w,h),使其不受ROI尺寸影响.
+- 优化偏移时分数坐标像素由整数坐标像素双线性插值而来，从而得到像素关于坐标的导梯度.
+
+#### selective kernal
+
+    Li X , Wang W , Hu X , et al. "Selective Kernel Networks". arXiv:1903.06585v2.
+
+- 原先的卷积感受野是固定的,不随特征变化，但生物的视觉神经感受野随外界刺激而变化.这里将卷积操作改造成感受野受前序特征图影响.
+- 做多分支不同感受野的输出(5x5的卷积可用3x3，dialation=2代替),然后elwise add后在空间上global pooling成C维向量,再经FC压缩和还原成分支数个向量(压缩比r可取16)，然后在C维各个维度上softmax得到个分支的权重，加权求和，得到感受野融合的特征.
+- 这种操作替代网络中的卷积,可以做成分组卷积的形式,将3x3的分组卷积全部替换掉后,即将ResNeXt 改造成SKNet.
+
+#### global context block
+
+    Cao Y , Xu J , Lin S , et al. "GCNet: Non-local Networks Meet Squeeze-Excitation Networks and Beyond". arXiv:1904.11492v1
+
+- Non-local[见video classification篇]为建立全局感受野,将特征建模成所有时空特征的加权组合.即
+$$
+z_i = x_i +w_z \Sigma_{j} f(x_i,x_j)/C(x)g(x_j)
+$$
+经常采用的实例f是embeding guassian,f(x_i,x_j) = exp(<w_ix_i,w_jx_j>),再用C(x)归一化,则为softmax_j(<w_ix_i,w_jx_j>),g(x_j)为线性表示(conv1x1,用于压缩通道),w_z也是线性用于恢复通道。但作者发现softmax_j(<w_ix_i,w_jx_j>)对于所有不同的位置i,几乎是相同的.因此可以简化Non-local,将其系数改成与计算位置无关：
+$$
+z_i = x_i + w_z\Sigma_j f(x_j)/C(x)w_j x_j = x_i + w_k\Sigma_j f(x_j)/C(x)x_j
+$$
+f仍是softmax_j(w_j x_j),即x conv 1x1输出一通道后在空间上softmax后得到系数,再以这些权重pooling.这里w_k采用SE的想法,分解成两个conv1x1，中间压缩r倍,可以减少参数.整个模块可插入到residual block add前或后.
+- 因GC block较轻量,不像Non-local只加一个,GC可在stage III,IV,V所有卷积中都添加.
+- GC 与SE的区别在于融合不采用scale而采用广播elewise add。SE中squeeze采用的是位置相同系数的ave pooling，这里pooling的权值是通过attention得到的.但此权重与位置无关(Non-local需要计算NxH此这样的权重)。
+
+#### Spatial Group-wise Enhance
+
+    Xiang Li, Xiaolin Hu, Jian Yang. "Spatial Group-wise Enhance: Improving Semantic Feature Learning in Convolutional Networks". arXiv:1905.09646
+
+- 认为feature捕捉到几个关键特征编码在不同的group中,在attetion中需要重点突出关键特征而抑制无关噪声,而加强或抑制的线索来自于与全局特征的相关性(特征向量与ave pooling后向量的余弦相关性).
+- 将feature map按channel维度分为G个group
+- 对每个group单独进行attention:
+  - 对group进行global average pooling得到g
+  - 进行pooling之后的g与原group feature进行element-wise dot
+  - 在进行norm(这里类似batch norm，有两个affine参数，也是仅有引入的参数)
+  - 再使用sigmoid进行激活
+  - 再与原group feature进行element-wise dot
