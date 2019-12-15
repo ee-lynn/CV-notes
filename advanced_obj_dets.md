@@ -210,6 +210,12 @@
     - 仍根据目标尺寸分配至各feature level,在[S_l/a^2,S_l*a^2]范围内的目标均分配在P_l 上. 在retinaNet中P3的尺寸S3取32，a取2.区间有所重叠，有些目标会被非配置不同level上
     - 定位的参数化方式不同. FoveaBox采用除以 sqrt(S_l)的归一化尺寸,且映射到对数空间,以SmoothL1作为损失.
 
+      Zhi Tian, Chunhua Shen, Hao Chen, Tong He. Fcos: fully convolutional one-stage object detection. FCOS: Fully Convolutional One-Stage Object Detection ICCV 2019
+    - 与上面两个anchor free检测器方法相同.不同之处在该文着重论述了当box重叠时预测目标的二义性的解决:不同尺度的目标放在FPN不同尺度上,可以降低feature map上一个像素点属于同一个目标,当这种情况真的发生时，该像素属于框回归更小的目标(更小的目标)
+    - 因为FCOS在框内都作为正样本,因此会有一些false positive。因此它在主干后面加了一只centerness的评分.定义为sqrt(min(l,r)/max(l,r)*min(b,t)/max(b,t)),越接近1越靠近中心，边缘处接近0.最后目标置信度为centerness与分类置信度的成绩,这样会在NMS阶段抑制false positive。因此它在主干后面加了一只centerness的评分
+    - 检测head共享权重，但回归距离归一化时各个尺度学习独有的归一化参数，即FoveaBox中sqrt(S_l)，FCOS以exp(a_i*x)表示回归距离，a是可学习参数
+
+
       Xingyi Zhou, Dequan Wang, Philipp Krähenbühl. "Objects as Points". arXiv:1904.07850
   
     - 思路更加简洁,每个框使用中心关键点加上回归尺寸表示.在骨架上添加head得到C通道预测stride整点关键点,2通道预测超像素的offset,2通道预测该中心点对应的宽和高.head结构均为Conv 3x3 + Conv 1x1. 回归的loss选用L1(实验中L1比smoothL1好很多)
