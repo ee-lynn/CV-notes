@@ -630,10 +630,10 @@ intuition:　既然前期研究结果显示神经网络深度很重要，那么�
 - 最后一个stage  
           inverted bottleneck 320　t=6
           Conv 1x1　1280 (为了特征丰富性)
-    这个inverted bottleneckxian先扩大在缩小，再扩大最后pooling.这里将Ave pooling直接接在Conv1x1扩大处,消除了缩小扩大反复的过程
+    这个inverted bottleneck先扩大在缩小，再扩大最后pooling.这里将Ave pooling直接接在Conv1x1扩大处,消除了缩小扩大反复的过程
     取消了depthwise Conv3x3和projection Conv1x1和 skip connection，即
 
-          Conv 1x1 960
+      Conv 1x1 960
 	  Ave pooling
 	  Conv 1x1 1280
 
@@ -660,6 +660,17 @@ intuition:　既然前期研究结果显示神经网络深度很重要，那么�
         Ave pool
         Conv 1x1　1280
         FC
+
+#### efficientnet
+
+   EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks ICML 2019 
+
+- 与mobileNet一脉相承,通过控制输入分辨率(空间维度的缩放系数)和网络宽度因子(通道维度的缩放系数)，以及新增加了网络深度缩放系数来控制模型的大小的性能。这三个因素单独控制模型大小时,模型性能会在计算量变大时逐渐饱和,本文发现当综合利用这三种方式后，相同的计算量下模型性能会更好。因此搜索了(网格搜索)这三种因子的组合方式，当计算量扩大一倍后模型性能最佳。
+- 当空间维度的缩放系数,通道维度的缩放系数,深度缩放系数分别取
+$$ \alpha = 1.15,  \beta = 1.1, \gamma = 1.2 $$
+时,模型可获得在计算量翻倍代价下性能最优。因此当给定计算量T时，只需要将基准模型(计算量L)在这三个维度上分别扩大
+$$ \alpha^{log_2T/O} , \beta^{log_2T/O} , \gamma^{log_2T/O} $$
+- 文中为基准模型搜索了一种结构，该结构与Mnasnet比较相似，外加了SE模块增强
 
 ### ShuffleNet family
 #### shuffleNet V1

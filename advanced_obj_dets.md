@@ -6,7 +6,7 @@
   （2）修改训练的细节提高模型性能，例如GHM,Libra-RCNN
   （3）多尺度预测：虽有feature pyramid，仍有一些work采用dialation conv死磕,例如TridentNet,RFBNet；
   （4）重解释置信度：以往目标检测的置信度理论上讲其实是proposal（two stage）或anchor（single shot）的分类置信度，与定位情况并不完全一致,例如IOUNet,ConRetinaNet,softer nms
-  （5）摒弃faster RCNN以来anchor这个宝贝，用关键点建模目标框,例如Guided Anchoring,CornerNet,FSAF,FoveaBox,CornerNet
+  （5）摒弃faster RCNN以来anchor这个宝贝，用关键点建模目标框,例如Guided Anchoring,CornerNet,FSAF,FoveaBox,CornerNet,FCOS
   总体而言，从cvpr 2019来看，目标检测这只鸡，可能需要分割这把牛刀来杀。
   本文除了总结了以上目标检测的新成果以外,还罗列了几个baseline[SSD/DSSD,R-FCN,FPN/RetinaNet]用以参考.(R-CNN系列和yolo系列在《RCNN和yolo的前世今生中已经总结,这里不再列出》)
 
@@ -60,14 +60,13 @@
 
   检测器由分类器作为骨架,但分类器一个重要的特性是对象位置的平移不变性，但位置对检测器至关重要。对于ResNet-101骨架,将RPN和检测器head都放在stage V,效果很差(Faster RCNN将这些都放在stage IV)，导致stage V 10层网络都是ROI wise的，推理时消耗较多时间.为将Faster-RCNN改造成全卷积结构,提出了position sensitive score map和position sensitive roi pooling
   - position sensitive score map:就是一般的feature map,仅仅是channel数规定为kxkx(C+1),k为每个roi被pooling至kxk，C为检测器类别
-  - position sensitive roi pooling:(论文没有写的很明白,通过看源码终于懂了什么意思)将一个ROI拆成kxk网格,每个网格内做pooling,但kxk中的每个网格是在position sensitive score map上对应channel取的，即kxk中每个网格在不同的channel上pooling,最后合并起来，得到Cxkxk的feature map，与Faster RCNN roi pooling之后结构相同.
-  - 在训练中,每个网格的信息会汇集到不同channel上,做到位置敏感.(个人觉得不太靠谱，但实验做出来有效)
-  - 为了增大最后feature map分辨率,在stage V中移除了stride=2，改用dialation=2.其余跟Faster-RCNN相同.
+  - position sensitive roi pooling:将一个ROI拆成kxk网格,每个网格内做pooling,但kxk中的每个网格是在position sensitive score map上对应channel取的，即kxk中每个网格在不同的channel上pooling,最后合并起来，得到Cxkxk的feature map,与Faster RCNN roi pooling之后结构相同.但得到Cxkxk的feature map后,直接在空间上ave pooling后softmax得到类别,对于目标框回归系数,position sensitive score map channel数是4xkxk， postion senitive pooling后得到4xkxk的feature map,然后在空间上ave pooling得到4个回归系数.检测头只剩下PSROI Pooling和AVE Pooling,完全避免了Faster RCNN在ROI Pooling之后的计算.   另一方面kxkx(C+1)厚的feature map实在是太厚了加速不明显,后续的light head RCNN 和Thunder Net将这部分用更少的特征数代替(类别不可知),pooling后保留一个FC,也可以得到很好的效果.
+  - 在训练中,每个网格的信息会汇集到不同channel上,做到位置敏感.为了增大最后feature map分辨率,在stage V中移除了stride=2，改用dialation=2.
 
 - 使用分割信息做多任务
     Kaiming He, Georgia Gkioxari, Piotr Dollár, Ross Girshick "Mask r-cnn". ICCV 2017
   
-  - 除classifier和regressor以外,再加一支全卷积(conv+convtrans),用于预测mask。像素级预测对对齐要求较高，为了获得较好的mask，需要对原先的ROI Pooling进行升级。原先的ROI Pooling有两次量化操作(1)proposal的边界量化到feature map的像素上,(2)pooling到7x7时,也进行了取整操作。ROI Align取消了这两个量化操作,在pooling至7x7时,直接根据分数坐标在每个bin中插值计算1个或4个点(4个点再pooling至1个点)
+  - 除classifier和regressor以外,再加一支全卷积(4xconv+deconv),用于预测mask。像素级预测对对齐要求较高，为了获得较好的mask，需要对原先的ROI Pooling进行升级。原先的ROI Pooling有两次量化操作(1)proposal的边界量化到feature map的像素上,(2)pooling到7x7时,也进行了取整操作。ROI Align取消了这两个量化操作,在pooling至7x7时,直接根据分数坐标在每个bin中插值计算1个或4个点(4个点再pooling至1个点)
   - 因为Faster RCNN中已经有分类分支,因此在mask中再进行类似语义分割那样做像素级分类采用softmax将会耦合两支,Mask RCNN采用sigmoid进行优化,每次进行时,对相应类别那个通道计算loss,推理时根据分类支路取出对应通道mask.
   - 训练和推理方式:训练时将proposal与GT重合的部分像素作为真值(将分割真值整点化到proposal 到全卷积输出的尺寸)。类似地,推理时将全卷积输出对应通道取出后resize到输出框尺寸，然后用阈值过滤。为了减少计算量,mask支路相对目标检测支路针对更少量的proposal进行计算(置信度阈值更高).
   - 实验的notes:(1)mask支路输出单通道(类别不可知)性能下降非常少,但采用softmax性能下降很大,分类还是应放在整体分类支路完成;(2)backbone一直采用到ResNet stage V后,性能比stage IV更好了,跟以往目标检测与平移不变性认识有些矛盾,主要是RIOAlign解决了特征对齐，在大stride时仍没有偏移. (3)采用ROIAlign后检测器性能提升较多,再加mask多任务训练后,AP也提升一些(~1个点)

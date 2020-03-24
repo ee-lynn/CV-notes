@@ -7,10 +7,10 @@
 卷积神经网络(CNN)基于时域或空域信号处理中的卷积操作，使用卷积核的参数进行学习(实际上CNN的卷积核出于方便的考虑被定义成了理论上卷积核的中心对称)。它是连续函数卷积操作的离散化，对栅格离散化的序列或图像具有天然的适应性。但对于非线性的数据结构,如树,图这样的数据结构，如何有效利用其拓扑信息需要将CNN进一步拓展，图卷积神经网络便是其中一种模型。对于N个特征为 
 $$ h \in \mathbb{R}^d $$ 
 的节点组成的图G，图卷积操作统一表述为
-$$ F(G_l,W_l)=Upadate(Aggregate(G_l,W^{agg}),W^{update}) $$
+$$ F(G_l,W_l)=Update(Aggregate(G_l,W^{agg}),W^{update}) $$
 Aggregation函数用于聚集邻居节点的特征,update函数用于更新节点的特征，
 $$ W^{agg}, W^{update} \qquad 分别是两个函数中可学习参数。$$
-该操作可以简单理解成常规卷积的拓展。在常规卷积中，G是HxW网格,每个格点具有C维的特征, Aggregate函数是以W^{agg}为权重的线性函数, Upadate是平均函数。但要深刻理解其理论基础，需要有更多的背景知识。本文将以图信号处理的角度阐释图上的傅里叶变换，卷积定理，CNN常规部件在GCN中的对应操作以及GCN在计算机视觉中的典型应用.
+该操作可以简单理解成常规卷积的拓展。在常规卷积中，G是HxW网格,每个格点具有C维的特征, Aggregate函数是以W^{agg}为权重的线性函数, Update是平均函数。但要深刻理解其理论基础，需要有更多的背景知识。本文将以图信号处理的角度阐释图上的傅里叶变换，卷积定理，CNN常规部件在GCN中的对应操作以及GCN在计算机视觉中的典型应用.
 
 ## 拉普拉斯算子与拉普拉斯矩阵的关系
 
@@ -44,7 +44,7 @@ $$ f*g = P(P^Tf \odot P^Tg) \qquad  \odot为elewise prod(Hadamard product). $$
 $$ f*g = Pdiag(\theta)P^Tf $$
 此时模型的卷积核与图大小相同，具有N个参数，需要在初始化阶段对L进行对角化。
 为克服这些问题，第二代GCN将卷积核参数化为
-$$ \Sigma_k=0^K \theta_kT_k(\Lambda) \qquad 这里T_k(\Lambda)为频率矩阵不超过k次的正交多项式$$
+$$ \Sigma_{k=0}^K \theta_kT_k(\Lambda) \qquad 这里T_k(\Lambda)为频率矩阵不超过k次的正交多项式$$
 - 第二代GCN采用截断的多项式来表示卷积核的频率，这里的技巧是采用特征频率展开，可以验证
 $$ T_k(\Lambda) = P^TT_k(L)P \rightarrow g=\Sigma_{k=0}^K\theta_kT_k(\Lambda) = P^T\Sigma_{k=0}^K\theta_kT_k(L)P $$
 $$ Pdiag(\theta)P^Tf = PP^T\Sigma_{k=0}^K\theta_kT_k(L)PP^Tf=\Sigma_{k=0}^K\theta_kT_k(L)f $$
@@ -61,9 +61,9 @@ $$  Lr=D^{-1}L $$
 
 堆叠多层图卷积操作便构成了深度图卷积神经网络模型。Aggregate可采用ave pooling,max pooling,LSTM等对输入变量个数没有要求的操作,有时候还要求对输入顺序无要求。Upadate一般都采用FC来实现。模型深度加大后，GCN也会面临CNN加大深度后面临的问题，可将CNN中的部件迁移至GCN:
 - Residual Learning for GCNs
-
+$$G_{l+1} =F(G_l,W_l)+ G_l$$
 - Dense Connections in GCNs
-
+$$G_{l+1}=concat(F(G_l,W_l), G_l)$$
 - Dilated Convolution
 在Aggregate时需根据中心节点与邻居节点之间距离排序，然后每相隔dilated rate个节点采样进行聚合
 
@@ -106,8 +106,8 @@ N(u)表示u的邻居节点。这种形式一方面可以将多种实现方式设
 以点云处理为例，可以将点云所处的3维空间中K近邻个节点相连,可以将在距离阈值范围以内的点相连，甚至可以将3维空间改成节点特征的高维空间中的K近邻或者距离阈值范围以内，计算量和性能都有所不同。
 - 关于在deep learning框架中实现GCN的问题
 一般而言，GCN比较特殊的操作为选出需与中心节点聚合的邻居节点，将这些邻居节点(经过共享权重的变换)聚合。都可以复用deep learning框架中为CNN设计的操作。
-将图以DNxC形式保存每个节点，并保存邻接矩阵WNxN,N为节点数,C是每个节点的特征维数，对于动态变化的图，实时更新邻接矩阵。
-前向时,使用W index出D中对应Ni行，共享权重可以使用FC(linear)或者conv1d。使用FC时tensor以NixC形式安排，使用conv1d时tensor以CxNi形式安排。聚合操作复用maxpooling1D即可。
+将图以D_{NxC}形式保存每个节点，并保存邻接矩阵W_{NxN},N为节点数,C是每个节点的特征维数，对于动态变化的图，实时更新邻接矩阵。
+前向时,使用W index出D中对应Ni行，共享权重可以使用FC(linear)或者conv1d。使用FC时tensor以N_ixC形式安排，使用conv1d时tensor以CxN_i形式安排。聚合操作复用maxpooling1D即可。
 
 **Reference**
 - [1] Bruna, J. , Zaremba, W. , Szlam, A. , & Lecun, Y.  Spectral networks and locally connected networks on graphs. ICLR 2014
