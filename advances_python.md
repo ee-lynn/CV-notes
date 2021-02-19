@@ -156,7 +156,7 @@ del a.name     #会调用property.deleter;实现了__delete__方法的描述符�
 `__getattr__(self,name)`捕获未定义的属性
 `__setattr__(self,name,value)`捕获所有的属性
 `__getattribute__(self,name)`捕获所有的属性
-- 为避免循环调用(在不火属性时进一步引用属性引起的递归调用,应对__dict__才做[该成员仍会被__getattribute__捕获],或者调用父类[如object]的对应函数(__getattr__等))
+- 为避免循环调用(在捕获属性时进一步引用属性引起的递归调用,应对__dict__才做[该成员仍会被__getattribute__捕获],或者调用父类[如object]的对应函数(__getattr__等))
 - 需要指出的是在python3中重载的魔法方法已经不能被捕获，在使用代理模式下需要重新实现,而在python2中魔法方法也会被属性重载方法捕获
 ## 7.python的字符串模型
 - python2中提供str和unicode类型. str表示每个字符可以用一个字节解释的字符串,同时任何二进制串也可以用此类型表示,unicode类型表示宽字节字符串，可以用u'spam'表示

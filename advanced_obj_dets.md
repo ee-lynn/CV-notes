@@ -119,7 +119,7 @@
     -\alpha_{t} (1-p_t)^\gamma log(p_t)
     $$
     \alpha_{t}用于调节该种类权重,(1-p_t)^\gamma用于区分难易样本. p_t为该类的预测概率
-    - 在FPN上每个feature level上连接两支subnet,分别是分类和回归。均是4层Conv 3x3再加 Conv 3x3输出，分类输出CK通道，回归输出4K通道,K为anchor个数,每个feature level安排3个anchor,3个宽高比共9个anchor.参数形式与Faster RCNN相同.回归系数是每个anchor共享(与别的检测器不同).C个类别用sigmoid表示,因此无背景类且每个类别独立,都是2分类问题.
+    - 在FPN上每个feature level上连接两支subnet,分别是分类和回归。均是4层Conv 3x3再加 Conv 3x3输出，分类输出CK通道，回归输出4K通道,K为anchor个数,每个feature level安排3个anchor,3个宽高比共9个anchor.参数形式与Faster RCNN相同.C个类别用sigmoid表示,因此无背景类且每个类别独立,都是2分类问题.
     - 为了稳定训练,分类最后一层bias初始化为 -log((1-p)/p)),p取0.01,这样初始输出前景的置信度便为0.01,新增的卷积层均用高斯初始化.训练得到的单阶段检测器称为RetinaNet
   
   - Gradient harmonized mechanism
@@ -211,7 +211,7 @@
 
       Zhi Tian, Chunhua Shen, Hao Chen, Tong He. Fcos: fully convolutional one-stage object detection. FCOS: Fully Convolutional One-Stage Object Detection ICCV 2019
     - 与上面两个anchor free检测器方法相同.不同之处在该文着重论述了当box重叠时预测目标的二义性的解决:不同尺度的目标放在FPN不同尺度上,可以降低feature map上一个像素点属于同一个目标,当这种情况真的发生时，该像素属于框回归更小的目标(更小的目标)
-    - 因为FCOS在框内都作为正样本,因此会有一些false positive。因此它在主干后面加了一只centerness的评分.定义为sqrt(min(l,r)/max(l,r)*min(b,t)/max(b,t)),越接近1越靠近中心，边缘处接近0.最后目标置信度为centerness与分类置信度的成绩,这样会在NMS阶段抑制false positive。因此它在主干后面加了一只centerness的评分
+    - 因为FCOS在框内都作为正样本,因此会有一些false positive。因此它在主干后面加了一只centerness的评分.定义为sqrt(min(l,r)/max(l,r)*min(b,t)/max(b,t)),越接近1越靠近中心，边缘处接近0.最后目标置信度为centerness与分类置信度的成绩,这样会在NMS阶段抑制false positive。因此它在回归分支后面加了一只centerness的评分
     - 检测head共享权重，但回归距离归一化时各个尺度学习独有的归一化参数，即FoveaBox中sqrt(S_l)，FCOS以exp(a_i*x)表示回归距离，a是可学习参数
 
 

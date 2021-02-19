@@ -28,7 +28,7 @@
   - 程序编译安装
   - Makefile书写
 - shell编程
-
+- 版本管理(git)
 ### C/C++程序编译调试
 
 - Makefile整体结构
@@ -91,52 +91,65 @@ Target2:dependencies
   - gdb 后，r(run), b(break),  c(continue),  p(print),  n(next), q(quit)
   - b 函数名/文件名:行号/当前文件的行号/类名:成员函数 
   - 显示断点 info break
+  
   - 删除断电 del break 断点编号
   - disp variable   相当于VC中的watch，执行后均显示值
   - 还可以看内存中的值 x/[个数][显示格式x/d/u/f/s][单位b/h/w/g] variable.  x(16进制)d(decimal)u(unsigned int)f(float)s(string) b(1)h(half word2)w(4)g(4 giant)个字节
-  - bt(backtrace)显示函数调用栈, nm查看符号, T(text)表示已经定义,U(undefined)表示未定义, readelf -d program 可以查看program依赖哪些库
+  - bt(backtrace)显示函数调用栈, nm查看符号, T(text)表示已经定义,U(undefined)表示未定义, readelf -d program 可以查看program依赖哪些库(或者ldd)
   - 内存转储: `ulimited -c unlimited`在挂掉时就会生成core文件, `gdb program core` 即可查看挂掉时的现场信息.
   
 ## shell编程
 - shell 文件头: #! /bin/bash
+- 给变量赋值直接等号即可,等号左右不能有空格。 引用时使用$var或者${var}  字符串变量最好用引号引起来，因当其中含有空格，会被断开
 - read -p "xxxx" var  <-> scanf("xxxxx",&var)
-- 参数在脚本里可以用$0,$1,$2...引用,$0是脚本本身，之后为输入变量列表，$#为参数个数
-- $[ 计算字符串 ]、$((计算字符串))可以用于计算表达式的值
+- 参数在脚本里可以用$0,$1,$2...引用,$0是脚本本身，之后为输入变量列表，$#为参数个数, $? 表示上一条命令退出状态,0成功,非0失败. $@所有变量,可迭代
+- $[ 计算字符串 ]、$((计算字符串))可以用于计算表达式的值 
+- $(shell 命令) 或者`shell 命令` 可以执行命令
 exec >.log  2>.mistake.log 表示后面脚本里日志输出位置
 - **选择分支结构**
 `if  ((condition))`    
-&nbsp;　`then　statement`
+　`then　statement`
 `elif [ condition ]`
 `then`
-&nbsp;　`statement` 
+　`statement` 
 `else`
-&nbsp;　`　statement`
+　`　statement`
 `fi`　
-- then写成一行，需要加;  或者把(())改成[ ]其中逻辑运算符就必须跟fortran类似　-gt etc.
-- []比较灵活，前后需要空格　可以直接在里面写命令　e.g.　-f 是文件，-d是文件目录　!非
-- [ -z $var ] #判断变量为空 
+- then写成一行，需要加;  把(())改成[ ]其中逻辑运算符就必须跟fortran类似　-gt -eq
+ etc.   != 和==只支持字符串  多个条件使用 &&,||,！ 联结 [] 
+- []比较灵活，前后需要空格　可以直接在里面写命令　e.g.　-f 是文件，-d是文件目录 -e 是否存在   -s 文件存在且不为空
+- -z "$var"  判断变量为空字符串, -n "$var"  判断变量不为空字符串
 - **多选择分支**
 `case var in`　　
-&nbsp;　　`condition 1)`
-&nbsp;　　　　`statement`
-&nbsp;　　　　`;;`
-&nbsp;　　`condition 2 | condition 3)`
-&nbsp;　　　　`statement`
-&nbsp;　　　　`;;`
-&nbsp;　　`*)`
-&nbsp;　　　　`statment`
-&nbsp;　　　　`;;`
-`esas`
+   `condition 1)`
+  　　　　`statement`
+　　　`;;`
+　　`condition 2 | condition 3)`
+　　　　`statement`
+　　　　`;;`
+　　`*)`
+　　　　`statment`
+　　　　`;;`
+`esac`
 - **循环结构**
-`for iter in iteratable`　　#cat; ls; seq　front end 返回都都可以迭代
-&nbsp;　　`do statement`
+python style
+`for iter in iteratable`　　#{start..end..interval} 表示range(start,end+1,interval)
+　　`do statement`
 `done`
-`while condition`      #  : 表示True
-&nbsp;　　`do statement`
+
+C style
+`for((i=0;i<n;i++))`
+`do statement`
 `done`
+
+
+`while condition`  
+`do statement`
+`done`
+
 - **函数**
 `func()`
 `{`
-&nbsp;　`statement`
-&nbsp;　`return var`
+`statement`
+`return var`
 `}`　#以宏定义的方式去理解它，其中的参数都通过$012...引用

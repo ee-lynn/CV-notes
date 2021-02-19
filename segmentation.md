@@ -61,15 +61,29 @@
 - U-Net
   
     `Ronneberger, Olaf , P. Fischer , and T. Brox . "U-Net: Convolutional Networks for Biomedical Image Segmentation." arXiv:1505.04597.`
+
 使用encoder-decoder结构,encoder中将空间分辨率逐渐下采样,decoder中将空间分辨率逐渐上采样，并且与encoder中相同尺寸的特征进行融合,构成了U字型的网络结构.
 - Global Convolution Network
   
     `Peng, Chao , et al. "Large Kernel Matters —— Improve Semantic Segmentation by Global Convolutional Network." CVPR 2017.`
+
 使用大卷积核增大特征的有效感受野，从而增强特征的语义信息.实现大卷积核的方式是用Conv 1xk+Conv kx1并联Conv kx1+Conv 1xk.将含大卷积核的模块嵌入在FCN中
 - BiSeNet
   
     `Yu, Changqian , et al. "BiSeNet: Bilateral Segmentation Network for Real-time Semantic Segmentation." ECCV 2018.`
+
 显式使用两分支网络来分辨编码空间语义(spatial context)和精细度(spatial detail)来解决语义分割两大矛盾.空间语义分支使用较少channel,较深的网络快速降采样(包括global pooling)来获得大感受和语义;特征精细度分支使用较多channel,较浅的网络保留丰富空间信息(实际上可只使用几个卷积层). 融合两支时使用concat+ conv(+SE)的方式得到结果.
+- EfficientFCN
+  
+  `Jianbo Liu, Junjun He, Jiawei Zhang, et.al. EfficientFCN: Holistically-guided Decoding for Semantic Segmentation, ECCV 2020`
+
+使用深层特征来引导编码浅层高分辨率的特征,绕开了上采样和空洞卷积,缓解空间精细和高层语义之间的矛盾.
+1. 对8x,16x,32x三个stage的特征进行融合:统一bilinear resize到8x和32x后concat;
+2. 对32x的深层次语义特征进行spatial attention得到codebook: 使用conv1x1分别得到$K \in \mathbb{R}^{n \times h/32 \times w/32}$,  $V \in \mathbb{R}^{1024 \times h/32 \times w/32}$ Q就直接使用单位张量, 进行attention操作$softmax_{w,h}(KQ)^TV$ 得到 $coodbook \in \mathbb{R}^{n \times 1024}$
+3. 使用codebook引导高分辨率特征: 使用8x的高分辨率特征conv1x1得到 $n \times h/8 \times w/8$ 与 codebook进行转置相乘得到精细化特征(形状为$1024 \times h/8 \times w/8$, codebookh和channel一一对应scale)，再与8x高分辨率特征concat
+   
+在3中得到的featuremap进一步conv1x1、上采样后得到语义分割.
+
 - 等等一众在性能和效率上引入小设计的方法和模型，个人感觉更多是architecture engineering,没有很多insight
 
 ## instance segmentaion
